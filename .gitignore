@@ -1,0 +1,9 @@
+# Runtime logs
+Logs/
+
+# User-generated reports
+Reports/
+
+# Per-user settings
+MECMHealthDash.windowstate.json
+MECMHealthDash.prefs.json
