@@ -2,6 +2,14 @@
 
 All notable changes to the MECM Health Dashboard are documented in this file.
 
+## [1.0.1] - 2026-03-03
+
+### Fixed
+
+- **Client health SQL query** -- Fixed invalid column name `LastOnlineTime` to `LastOnline` in `v_CH_ClientSummary` queries; affected both Client Health and Inactive Devices tabs (query failed silently, returning 0 records)
+- **SQL error visibility** -- Client health and inactive device query failures now log a warning in the UI log panel (previously errors were only written to the log file)
+- **SQL connection state** -- Changing the SQL Server in Preferences now resets the connection state so the new server is tested on the next refresh
+
 ## [1.0.0] - 2026-02-26
 
 ### Added

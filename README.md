@@ -55,7 +55,7 @@ Three data paths, used where each is strongest:
 
 - **CM cmdlets** (via PSDrive): deployment and DP data
 - **WMI** (via Get-CimInstance): bulk content status, site components, site systems
-- **SQL** (via Invoke-Sqlcmd): client health and inactive device data
+- **SQL** (via Invoke-Sqlcmd): client health and inactive device data (queries `v_CH_ClientSummary.LastOnline`; older MECM versions may use `LastActiveTime` -- see Troubleshooting)
 
 ### Auto-Refresh
 
@@ -114,6 +114,14 @@ Stored in `MECMHealthDash.prefs.json`. Accessible via File > Preferences.
 | SQLServer | SQL Server hostname for CM database |
 | AutoRefreshMinutes | Auto-refresh interval (5, 10, 15, 30, 60) |
 | InactiveThresholdDays | Days since last DDR to consider a device inactive |
+
+## Troubleshooting
+
+**Client Health / Inactive Devices tabs are empty**
+
+- Verify your SQL Server is configured in File > Preferences
+- Check the Logs folder for SQL error messages (e.g., `Client health SQL query failed:`)
+- If the error mentions an invalid column name, your MECM version may use `LastActiveTime` instead of `LastOnline` in `v_CH_ClientSummary`. Update the column name in `Module/MECMHealthDashCommon.psm1` in both `Get-ClientHealthSummary` and `Get-InactiveDevices`
 
 ## License
 

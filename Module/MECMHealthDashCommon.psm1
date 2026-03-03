@@ -520,7 +520,7 @@ function Get-ClientHealthSummary {
         "    sys.Name0 AS DeviceName,",
         "    ISNULL(ch.HealthState, 0) AS HealthState,",
         "    ISNULL(ch.ClientActiveStatus, 0) AS ClientActiveStatus,",
-        "    ch.LastOnlineTime,",
+        "    ch.LastOnline AS LastOnlineTime,",
         "    ch.LastDDR,",
         "    ch.LastPolicyRequest,",
         "    ch.LastHW AS LastHWInventory,",
@@ -613,7 +613,7 @@ function Get-InactiveDevices {
     $query = @(
         "SELECT",
         "    sys.Name0 AS DeviceName,",
-        "    ch.LastOnlineTime,",
+        "    ch.LastOnline AS LastOnlineTime,",
         "    ch.LastDDR,",
         "    DATEDIFF(day, ch.LastDDR, GETDATE()) AS DaysSinceContact,",
         "    sys.Operating_System_Name_and0 AS OperatingSystem,",

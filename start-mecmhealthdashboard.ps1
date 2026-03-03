@@ -415,9 +415,13 @@ function Show-PreferencesDialog {
         $script:Prefs.DarkMode              = $chkDark.Checked
         $script:Prefs.SiteCode              = $txtSiteCodePref.Text.Trim().ToUpper()
         $script:Prefs.SMSProvider           = $txtServerPref.Text.Trim()
+        $sqlChanged = ($txtSQLPref.Text.Trim() -ne $script:Prefs.SQLServer)
         $script:Prefs.SQLServer             = $txtSQLPref.Text.Trim()
         $script:Prefs.AutoRefreshMinutes    = [int]$cboInterval.SelectedItem
         Save-HdPreferences -Prefs $script:Prefs
+
+        # Force SQL retest on next refresh if server changed
+        if ($sqlChanged) { $script:SQLConnected = $false }
 
         # Update connection bar labels
         $lblSiteVal.Text   = if ($script:Prefs.SiteCode)    { $script:Prefs.SiteCode }    else { '(not set)' }
@@ -1610,7 +1614,11 @@ function Invoke-RefreshAll {
             [System.Windows.Forms.Application]::DoEvents()
             $script:ClientData = @(Get-ClientHealthSummary -SQLServer $script:Prefs.SQLServer -SiteCode $script:Prefs.SiteCode)
             $clientCounts = Get-ClientHealthCounts -ClientData $script:ClientData
-            Add-LogLine -TextBox $txtLog -Message "Clients: $($clientCounts.HealthyCount) healthy, $($clientCounts.UnhealthyCount) unhealthy, $($clientCounts.InactiveCount) inactive"
+            if ($script:ClientData.Count -eq 0) {
+                Add-LogLine -TextBox $txtLog -Message "WARNING: Client health query returned 0 records (check Logs folder for SQL errors)"
+            } else {
+                Add-LogLine -TextBox $txtLog -Message "Clients: $($clientCounts.HealthyCount) healthy, $($clientCounts.UnhealthyCount) unhealthy, $($clientCounts.InactiveCount) inactive"
+            }
             [System.Windows.Forms.Application]::DoEvents()
 
             $dtClients.Clear()
