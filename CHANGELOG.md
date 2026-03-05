@@ -2,6 +2,13 @@
 
 All notable changes to the MECM Health Dashboard are documented in this file.
 
+## [1.0.2] - 2026-03-04
+
+### Fixed
+- Dark mode restart now captures script path at function scope (`$scriptFile = Join-Path $PSScriptRoot ...`) instead of using `$PSCommandPath` which resolves to empty inside event handler scriptblocks
+
+---
+
 ## [1.0.1] - 2026-03-03
 
 ### Fixed
