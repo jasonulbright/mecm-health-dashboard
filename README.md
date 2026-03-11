@@ -54,7 +54,7 @@ Cards are green (healthy), yellow (warning), or red (critical). Click any card t
 Three data paths, used where each is strongest:
 
 - **CM cmdlets** (via PSDrive): deployment and DP data
-- **WMI** (via Get-CimInstance): bulk content status, site components, site systems
+- **WMI** (via Get-CimInstance): bulk content status (`SMS_PackageStatusDistPointsSummarizer`), site components (`SMS_ComponentSummarizer`), site systems (`SMS_SiteSystemSummarizer`) -- no CM cmdlet equivalents exist for these summarizer/health aggregation classes
 - **SQL** (via Invoke-Sqlcmd): client health and inactive device data (queries `v_CH_ClientSummary.LastOnline`; older MECM versions may use `LastActiveTime` -- see Troubleshooting)
 
 ### Auto-Refresh
