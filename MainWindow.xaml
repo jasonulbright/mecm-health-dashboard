@@ -1,0 +1,644 @@
+<Controls:MetroWindow
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+    Title="MECM Health Dashboard"
+    Width="1400" Height="860"
+    MinWidth="1100" MinHeight="680"
+    WindowStartupLocation="CenterScreen"
+    TitleCharacterCasing="Normal"
+    GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
+    NonActiveGlowBrush="{DynamicResource MahApps.Brushes.Accent}"
+    BorderThickness="1"
+    ShowIconOnTitleBar="False">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Sidebar button template: shade-lift on Pressed instead of MahApps
+                 Square default (which inverts colors via VSM and renders white
+                 text invisible on the dark-theme sidebar). See
+                 reference_srl_wpf_brand.md S11. -->
+            <ControlTemplate x:Key="SidebarButtonTemplate" TargetType="Button">
+                <Border x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        SnapsToDevicePixels="True">
+                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Margin="{TemplateBinding Padding}"
+                                      RecognizesAccessKey="True"
+                                      SnapsToDevicePixels="True"/>
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter TargetName="Bd" Property="Background">
+                            <Setter.Value>
+                                <SolidColorBrush Color="#3A3A3A"/>
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+
+            <Style x:Key="ViewButtonStyle" TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square}">
+                <Setter Property="Template" Value="{StaticResource SidebarButtonTemplate}"/>
+                <Setter Property="Height" Value="42"/>
+                <Setter Property="Margin" Value="8,3,8,3"/>
+                <Setter Property="Padding" Value="12,0,12,0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Background">
+                    <Setter.Value><SolidColorBrush Color="#1E1E1E"/></Setter.Value>
+                </Setter>
+                <Setter Property="BorderBrush">
+                    <Setter.Value><SolidColorBrush Color="#555555"/></Setter.Value>
+                </Setter>
+                <Setter Property="BorderThickness" Value="1"/>
+            </Style>
+
+            <Style x:Key="OptionsButtonStyle" TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square}">
+                <Setter Property="Template" Value="{StaticResource SidebarButtonTemplate}"/>
+                <Setter Property="Height" Value="42"/>
+                <Setter Property="Margin" Value="8,3,8,3"/>
+                <Setter Property="Padding" Value="12,0,12,0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Background">
+                    <Setter.Value><SolidColorBrush Color="#1E1E1E"/></Setter.Value>
+                </Setter>
+                <Setter Property="BorderBrush">
+                    <Setter.Value><SolidColorBrush Color="#555555"/></Setter.Value>
+                </Setter>
+                <Setter Property="BorderThickness" Value="1"/>
+            </Style>
+
+            <Style x:Key="SquareInlineButtonStyle" TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square}">
+                <Setter Property="Height" Value="28"/>
+                <Setter Property="MinWidth" Value="100"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
+                <Setter Property="FontSize" Value="12"/>
+            </Style>
+
+            <Style x:Key="ViewDataGrid" TargetType="DataGrid">
+                <Setter Property="AutoGenerateColumns" Value="False"/>
+                <Setter Property="CanUserAddRows" Value="False"/>
+                <Setter Property="CanUserDeleteRows" Value="False"/>
+                <Setter Property="IsReadOnly" Value="True"/>
+                <Setter Property="SelectionMode" Value="Single"/>
+                <Setter Property="SelectionUnit" Value="FullRow"/>
+                <Setter Property="HeadersVisibility" Value="Column"/>
+                <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+                <Setter Property="RowHeaderWidth" Value="0"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="ColumnHeaderHeight" Value="30"/>
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.ThemeBackground}"/>
+                <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
+                <Setter Property="RowBackground" Value="{DynamicResource MahApps.Brushes.ThemeBackground}"/>
+                <Setter Property="AlternatingRowBackground" Value="{DynamicResource MahApps.Brushes.Control.Background}"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource MahApps.Brushes.Gray8}"/>
+            </Style>
+
+            <Style x:Key="GridCellStyle" TargetType="DataGridCell" BasedOn="{StaticResource MahApps.Styles.DataGridCell}">
+                <Setter Property="Padding" Value="6,0,6,0"/>
+            </Style>
+
+            <Style x:Key="GridHeaderStyle" TargetType="DataGridColumnHeader" BasedOn="{StaticResource MahApps.Styles.DataGridColumnHeader}">
+                <Setter Property="Padding" Value="6,0,6,0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            </Style>
+
+            <Style x:Key="GridHeaderCenterStyle" TargetType="DataGridColumnHeader" BasedOn="{StaticResource MahApps.Styles.DataGridColumnHeader}">
+                <Setter Property="Padding" Value="6,0,6,0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="GlyphCellStyle" TargetType="DataGridCell" BasedOn="{StaticResource MahApps.Styles.DataGridCell}">
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="FontFamily" Value="Segoe UI Symbol"/>
+                <Setter Property="FontSize" Value="14"/>
+            </Style>
+
+            <Style x:Key="DetailTextStyle" TargetType="TextBox">
+                <Setter Property="IsReadOnly" Value="True"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+                <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Courier New"/>
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="8"/>
+            </Style>
+
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="1"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ================================================================ -->
+        <!-- LEFT SIDEBAR                                                     -->
+        <!-- ================================================================ -->
+        <Border Grid.Column="0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="14,14,14,12">
+                    <TextBlock x:Name="txtAppTitle" Text="MECM Health Dashboard"
+                               FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="txtVersion" Text="v1.0.0" FontSize="10"
+                               Foreground="{DynamicResource MahApps.Brushes.Gray1}"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,14">
+                    <Separator Margin="0,8,0,10"/>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock x:Name="txtThemeLabel" Text="Dark Theme"
+                                   DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="12"/>
+                        <Controls:ToggleSwitch x:Name="toggleTheme"
+                                               DockPanel.Dock="Right"
+                                               IsOn="True"
+                                               OnContent="" OffContent=""
+                                               MinWidth="0"
+                                               ToolTip="Toggle dark / light theme"/>
+                    </DockPanel>
+                </StackPanel>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Button x:Name="btnViewDeployments" Content="Deployments" Style="{StaticResource ViewButtonStyle}"
+                                ToolTip="Application, package, software-update, and task-sequence deployments with success / error / in-progress counts"/>
+                        <Button x:Name="btnViewContent" Content="Content" Style="{StaticResource ViewButtonStyle}"
+                                ToolTip="Content distribution status: only items with failed or in-progress DP-content pairs"/>
+                        <Button x:Name="btnViewDPs" Content="Distribution Points" Style="{StaticResource ViewButtonStyle}"
+                                ToolTip="DP roster with site, status, and pull-DP flag"/>
+                        <Button x:Name="btnViewClients" Content="Client Health" Style="{StaticResource ViewButtonStyle}"
+                                ToolTip="Per-device CCM health: HealthState, ActiveStatus, last-online / DDR / policy / HW inventory"/>
+                        <Button x:Name="btnViewInactive" Content="Inactive Devices" Style="{StaticResource ViewButtonStyle}"
+                                ToolTip="Devices exceeding the inactivity threshold (configurable in Options)"/>
+                        <Button x:Name="btnViewSite" Content="Site Health" Style="{StaticResource ViewButtonStyle}"
+                                ToolTip="Site components and site-system roles via SMS_ComponentSummarizer / SMS_SiteSystemSummarizer"/>
+
+                        <Button x:Name="btnOptions" Content="Options"
+                                Style="{StaticResource OptionsButtonStyle}"
+                                Margin="8,24,8,3"
+                                ToolTip="Site code, SMS provider, SQL server, refresh interval, inactivity threshold, about"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Column="1" Background="{DynamicResource MahApps.Brushes.Gray8}"/>
+
+        <!-- ================================================================ -->
+        <!-- MAIN CONTENT AREA                                                -->
+        <!-- Row layout:                                                      -->
+        <!--   0  module header band (view title + subtitle)                  -->
+        <!--   1  action bar (Refresh, filter, status filter, exports)        -->
+        <!--   2  content host (7 views Visibility-swapped)                   -->
+        <!--   3  GridSplitter                                                -->
+        <!--   4  log drawer                                                  -->
+        <!--   5  status bar                                                  -->
+        <!-- ================================================================ -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="160"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{DynamicResource MahApps.Brushes.Gray10}" Padding="16,12,16,10">
+                <StackPanel>
+                    <TextBlock x:Name="txtModuleTitle" Text="Deployments" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="txtModuleSubtitle"
+                               Text="Configure Site / Provider in Options, then click Refresh."
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource MahApps.Brushes.Gray1}"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1" Padding="16,10,16,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="btnRefreshAll"
+                            Grid.Column="0"
+                            Content="Refresh All"
+                            Style="{StaticResource SquareInlineButtonStyle}"
+                            MinWidth="120"
+                            ToolTip="Refresh every health area (deployments, content, DPs, clients, inactive devices, site components)"/>
+
+                    <Button x:Name="btnPauseResume"
+                            Grid.Column="1"
+                            Content="Pause Auto-Refresh"
+                            Style="{StaticResource SquareInlineButtonStyle}"
+                            MinWidth="160"
+                            ToolTip="Pause / resume the auto-refresh timer"/>
+
+                    <TextBox x:Name="txtFilter"
+                             Grid.Column="2"
+                             FontSize="12"
+                             Padding="6,4,6,4"
+                             Margin="8,0,8,0"
+                             Controls:TextBoxHelper.Watermark="Filter rows..."/>
+
+                    <ComboBox x:Name="cboStatus"
+                              Grid.Column="3"
+                              Width="160"
+                              Margin="0,0,8,0"
+                              FontSize="12"
+                              ToolTip="Limit rows by status">
+                        <ComboBoxItem Content="All" IsSelected="True"/>
+                        <ComboBoxItem Content="OK / Healthy"/>
+                        <ComboBoxItem Content="Warning / In Progress"/>
+                        <ComboBoxItem Content="Failed / Error"/>
+                    </ComboBox>
+
+                    <Button x:Name="btnExportCsv"   Grid.Column="4" Content="Export CSV"   Style="{StaticResource SquareInlineButtonStyle}"
+                            ToolTip="Export the active view to CSV"/>
+                    <Button x:Name="btnExportHtml"  Grid.Column="5" Content="Export HTML"  Style="{StaticResource SquareInlineButtonStyle}"
+                            ToolTip="Export the active view to a styled HTML report"/>
+                    <Button x:Name="btnCopySummary" Grid.Column="6" Content="Copy Summary" Style="{StaticResource SquareInlineButtonStyle}"
+                            ToolTip="Copy a plain-text health summary to the clipboard"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2" Margin="8,0,8,0">
+
+                <!-- ============================================================ -->
+                <!-- View: Deployments                                            -->
+                <!-- ============================================================ -->
+                <Grid x:Name="viewDeployments" Visibility="Visible">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <DataGrid x:Name="gridDeploy"
+                              Grid.Row="0"
+                              Style="{StaticResource ViewDataGrid}"
+                              ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                              CellStyle="{StaticResource GridCellStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="" Width="32"
+                                                Binding="{Binding StatusGlyph}"
+                                                CellStyle="{StaticResource GlyphCellStyle}"
+                                                HeaderStyle="{StaticResource GridHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Deployment" Width="2*"
+                                                Binding="{Binding DeploymentName}"/>
+                            <DataGridTextColumn Header="Type" Width="110"
+                                                Binding="{Binding DeploymentType}"/>
+                            <DataGridTextColumn Header="Collection" Width="2*"
+                                                Binding="{Binding CollectionName}"/>
+                            <DataGridTextColumn Header="Purpose" Width="80"
+                                                Binding="{Binding Purpose}"/>
+                            <DataGridTextColumn Header="Targeted" Width="70"
+                                                Binding="{Binding NumberTargeted}"/>
+                            <DataGridTextColumn Header="Success" Width="70"
+                                                Binding="{Binding NumberSuccess}"/>
+                            <DataGridTextColumn Header="Errors" Width="70"
+                                                Binding="{Binding NumberErrors}"/>
+                            <DataGridTextColumn Header="In Progress" Width="80"
+                                                Binding="{Binding NumberInProgress}"/>
+                            <DataGridTextColumn Header="% Compliant" Width="*"
+                                                Binding="{Binding PercentCompliant}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource MahApps.Brushes.Gray8}"
+                                  ResizeDirection="Rows"/>
+
+                    <TextBox x:Name="txtDeployDetail"
+                             Grid.Row="2"
+                             Style="{StaticResource DetailTextStyle}"
+                             Text="Select a deployment to see status breakdown."/>
+                </Grid>
+
+                <!-- ============================================================ -->
+                <!-- View: Content Distribution                                   -->
+                <!-- ============================================================ -->
+                <Grid x:Name="viewContent" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <DataGrid x:Name="gridContent"
+                              Grid.Row="0"
+                              Style="{StaticResource ViewDataGrid}"
+                              ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                              CellStyle="{StaticResource GridCellStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="" Width="32"
+                                                Binding="{Binding StatusGlyph}"
+                                                CellStyle="{StaticResource GlyphCellStyle}"
+                                                HeaderStyle="{StaticResource GridHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Content Name" Width="2*"
+                                                Binding="{Binding ContentName}"/>
+                            <DataGridTextColumn Header="Type" Width="120"
+                                                Binding="{Binding ContentType}"/>
+                            <DataGridTextColumn Header="Package ID" Width="100"
+                                                Binding="{Binding PackageID}"/>
+                            <DataGridTextColumn Header="Total DPs" Width="80"
+                                                Binding="{Binding TotalDPs}"/>
+                            <DataGridTextColumn Header="Installed" Width="80"
+                                                Binding="{Binding InstalledCount}"/>
+                            <DataGridTextColumn Header="Failed" Width="80"
+                                                Binding="{Binding FailedCount}"/>
+                            <DataGridTextColumn Header="In Progress" Width="*"
+                                                Binding="{Binding InProgressCount}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource MahApps.Brushes.Gray8}"
+                                  ResizeDirection="Rows"/>
+
+                    <TextBox x:Name="txtContentDetail"
+                             Grid.Row="2"
+                             Style="{StaticResource DetailTextStyle}"
+                             Text="Select a content item to see DP breakdown."/>
+                </Grid>
+
+                <!-- ============================================================ -->
+                <!-- View: Distribution Points                                    -->
+                <!-- ============================================================ -->
+                <Grid x:Name="viewDPs" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <DataGrid x:Name="gridDPs"
+                              Grid.Row="0"
+                              Style="{StaticResource ViewDataGrid}"
+                              ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                              CellStyle="{StaticResource GridCellStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="" Width="32"
+                                                Binding="{Binding StatusGlyph}"
+                                                CellStyle="{StaticResource GlyphCellStyle}"
+                                                HeaderStyle="{StaticResource GridHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="DP Name" Width="2*"
+                                                Binding="{Binding DPName}"/>
+                            <DataGridTextColumn Header="Site" Width="80"
+                                                Binding="{Binding SiteCode}"/>
+                            <DataGridTextColumn Header="Status" Width="120"
+                                                Binding="{Binding Status}"/>
+                            <DataGridTextColumn Header="Total Content" Width="100"
+                                                Binding="{Binding TotalContent}"/>
+                            <DataGridTextColumn Header="Failed" Width="80"
+                                                Binding="{Binding FailedContent}"/>
+                            <DataGridTextColumn Header="Pull DP" Width="*"
+                                                Binding="{Binding IsPullDP}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource MahApps.Brushes.Gray8}"
+                                  ResizeDirection="Rows"/>
+
+                    <TextBox x:Name="txtDPDetail"
+                             Grid.Row="2"
+                             Style="{StaticResource DetailTextStyle}"
+                             Text="Select a distribution point to see details."/>
+                </Grid>
+
+                <!-- ============================================================ -->
+                <!-- View: Client Health                                          -->
+                <!-- ============================================================ -->
+                <Grid x:Name="viewClients" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <DataGrid x:Name="gridClients"
+                              Grid.Row="0"
+                              Style="{StaticResource ViewDataGrid}"
+                              ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                              CellStyle="{StaticResource GridCellStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="" Width="32"
+                                                Binding="{Binding StatusGlyph}"
+                                                CellStyle="{StaticResource GlyphCellStyle}"
+                                                HeaderStyle="{StaticResource GridHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Device" Width="2*"
+                                                Binding="{Binding DeviceName}"/>
+                            <DataGridTextColumn Header="Health" Width="100"
+                                                Binding="{Binding HealthState}"/>
+                            <DataGridTextColumn Header="Active" Width="80"
+                                                Binding="{Binding ActiveStatus}"/>
+                            <DataGridTextColumn Header="Last Online" Width="130"
+                                                Binding="{Binding LastOnlineDisplay}"/>
+                            <DataGridTextColumn Header="Last DDR" Width="130"
+                                                Binding="{Binding LastDDRDisplay}"/>
+                            <DataGridTextColumn Header="Last Policy" Width="130"
+                                                Binding="{Binding LastPolicyDisplay}"/>
+                            <DataGridTextColumn Header="Last HW Inv" Width="130"
+                                                Binding="{Binding LastHWDisplay}"/>
+                            <DataGridTextColumn Header="Client Version" Width="*"
+                                                Binding="{Binding ClientVersion}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource MahApps.Brushes.Gray8}"
+                                  ResizeDirection="Rows"/>
+
+                    <TextBox x:Name="txtClientDetail"
+                             Grid.Row="2"
+                             Style="{StaticResource DetailTextStyle}"
+                             Text="Select a device to see client health details."/>
+                </Grid>
+
+                <!-- ============================================================ -->
+                <!-- View: Inactive Devices                                       -->
+                <!-- ============================================================ -->
+                <Grid x:Name="viewInactive" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <DataGrid x:Name="gridInactive"
+                              Grid.Row="0"
+                              Style="{StaticResource ViewDataGrid}"
+                              ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                              CellStyle="{StaticResource GridCellStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="" Width="32"
+                                                Binding="{Binding StatusGlyph}"
+                                                CellStyle="{StaticResource GlyphCellStyle}"
+                                                HeaderStyle="{StaticResource GridHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Device" Width="2*"
+                                                Binding="{Binding DeviceName}"/>
+                            <DataGridTextColumn Header="Last Online" Width="140"
+                                                Binding="{Binding LastOnlineDisplay}"/>
+                            <DataGridTextColumn Header="Last DDR" Width="140"
+                                                Binding="{Binding LastDDRDisplay}"/>
+                            <DataGridTextColumn Header="Days Since" Width="100"
+                                                Binding="{Binding DaysSinceContact}"/>
+                            <DataGridTextColumn Header="Operating System" Width="2*"
+                                                Binding="{Binding OperatingSystem}"/>
+                            <DataGridTextColumn Header="Client Version" Width="*"
+                                                Binding="{Binding ClientVersion}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource MahApps.Brushes.Gray8}"
+                                  ResizeDirection="Rows"/>
+
+                    <TextBox x:Name="txtInactiveDetail"
+                             Grid.Row="2"
+                             Style="{StaticResource DetailTextStyle}"
+                             Text="Select a device to see contact history."/>
+                </Grid>
+
+                <!-- ============================================================ -->
+                <!-- View: Site Health                                            -->
+                <!-- ============================================================ -->
+                <Grid x:Name="viewSite" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="200"/>
+                    </Grid.RowDefinitions>
+
+                    <DataGrid x:Name="gridSite"
+                              Grid.Row="0"
+                              Style="{StaticResource ViewDataGrid}"
+                              ColumnHeaderStyle="{StaticResource GridHeaderStyle}"
+                              CellStyle="{StaticResource GridCellStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="" Width="32"
+                                                Binding="{Binding StatusGlyph}"
+                                                CellStyle="{StaticResource GlyphCellStyle}"
+                                                HeaderStyle="{StaticResource GridHeaderCenterStyle}"/>
+                            <DataGridTextColumn Header="Name" Width="2*"
+                                                Binding="{Binding Name}"/>
+                            <DataGridTextColumn Header="Type" Width="110"
+                                                Binding="{Binding ItemType}"/>
+                            <DataGridTextColumn Header="Server" Width="2*"
+                                                Binding="{Binding MachineName}"/>
+                            <DataGridTextColumn Header="Status" Width="110"
+                                                Binding="{Binding Status}"/>
+                            <DataGridTextColumn Header="State" Width="120"
+                                                Binding="{Binding State}"/>
+                            <DataGridTextColumn Header="Last Started" Width="*"
+                                                Binding="{Binding LastStartedDisplay}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource MahApps.Brushes.Gray8}"
+                                  ResizeDirection="Rows"/>
+
+                    <TextBox x:Name="txtSiteDetail"
+                             Grid.Row="2"
+                             Style="{StaticResource DetailTextStyle}"
+                             Text="Select a component or site system for details."/>
+                </Grid>
+
+                <!-- Options is rendered via a separate modal MetroWindow popup
+                     (see Show-OptionsDialog in the shell). This matches the
+                     supersedence-auditor / app-packager brand pattern and
+                     keeps the main window's visual tree free of inline option
+                     controls. -->
+
+                <!-- ============================================================ -->
+                <!-- Progress overlay (refresh in flight)                         -->
+                <!-- ============================================================ -->
+                <Border x:Name="progressOverlay"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"
+                        Background="{DynamicResource MahApps.Brushes.ThemeBackground}"
+                        Opacity="0.92">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Controls:ProgressRing IsActive="True" Width="56" Height="56"
+                                               Foreground="{DynamicResource MahApps.Brushes.Accent}"/>
+                        <TextBlock x:Name="txtProgressTitle"
+                                   Text="Refreshing..."
+                                   FontSize="18" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,14,0,0"/>
+                        <TextBlock x:Name="txtProgressStep"
+                                   Text=""
+                                   FontSize="12"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,6,0,0"
+                                   Foreground="{DynamicResource MahApps.Brushes.Gray1}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch"
+                          Background="{DynamicResource MahApps.Brushes.Gray8}"
+                          ResizeDirection="Rows"/>
+
+            <Border Grid.Row="4">
+                <DockPanel>
+                    <TextBlock x:Name="lblLogOutput" DockPanel.Dock="Top" Text="LOG OUTPUT"
+                               FontSize="10" FontWeight="SemiBold"
+                               Margin="8,6,0,4"/>
+                    <TextBox x:Name="txtLog"
+                             IsReadOnly="True"
+                             TextWrapping="NoWrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Cascadia Code, Consolas, Courier New"
+                             FontSize="11"
+                             BorderThickness="0"
+                             Margin="4,0,4,4"/>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Row="5" Padding="8,4,8,4"
+                    Background="{DynamicResource MahApps.Brushes.Gray10}">
+                <TextBlock x:Name="txtStatus" Text="Disconnected. Configure Site / SMS Provider in Options, then click Refresh All." FontSize="11"/>
+            </Border>
+        </Grid>
+    </Grid>
+
+</Controls:MetroWindow>
