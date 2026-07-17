@@ -22,8 +22,8 @@
 
 .NOTES
     ScriptName : start-mecmhealthdashboard.ps1
-    Version    : 1.0.0
-    Updated    : 2026-05-01
+    Version    : 1.1.0
+    Updated    : 2026-07-17
 #>
 
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Per feedback_ps_wpf_handler_rules.md and PS51-WPF-001..003: flat-.ps1 GetNewClosure strips $script: scope. $global: survives closure scope-strip and keeps shared mutable state reachable from closure-captured handlers.')]
@@ -99,6 +99,8 @@ function Get-HdPreferences {
         SQLServer             = ''
         AutoRefreshMinutes    = 15
         InactiveThresholdDays = 14
+        AlertsEnabled         = $true
+        AlertCompliancePct    = 80
     }
     if (Test-Path -LiteralPath $global:PrefsPath) {
         try {
@@ -150,6 +152,7 @@ $btnViewDPs         = $window.FindName('btnViewDPs')
 $btnViewClients     = $window.FindName('btnViewClients')
 $btnViewInactive    = $window.FindName('btnViewInactive')
 $btnViewSite        = $window.FindName('btnViewSite')
+$btnViewTrends      = $window.FindName('btnViewTrends')
 $btnOptions         = $window.FindName('btnOptions')
 
 $txtModuleTitle    = $window.FindName('txtModuleTitle')
@@ -169,6 +172,13 @@ $viewDPs         = $window.FindName('viewDPs')
 $viewClients     = $window.FindName('viewClients')
 $viewInactive    = $window.FindName('viewInactive')
 $viewSite        = $window.FindName('viewSite')
+$viewTrends      = $window.FindName('viewTrends')
+
+$cboTrendMetric  = $window.FindName('cboTrendMetric')
+$cboTrendRange   = $window.FindName('cboTrendRange')
+$canvasTrend     = $window.FindName('canvasTrend')
+$txtTrendEmpty   = $window.FindName('txtTrendEmpty')
+$txtTrendSummary = $window.FindName('txtTrendSummary')
 
 $gridDeploy   = $window.FindName('gridDeploy');   $txtDeployDetail   = $window.FindName('txtDeployDetail')
 $gridContent  = $window.FindName('gridContent');  $txtContentDetail  = $window.FindName('txtContentDetail')
@@ -402,7 +412,8 @@ $script:ViewButtons = @(
     @{ Name = 'DPs';               Button = $btnViewDPs         },
     @{ Name = 'Clients';           Button = $btnViewClients     },
     @{ Name = 'Inactive';          Button = $btnViewInactive    },
-    @{ Name = 'Site';              Button = $btnViewSite        }
+    @{ Name = 'Site';              Button = $btnViewSite        },
+    @{ Name = 'Trends';            Button = $btnViewTrends      }
 )
 $script:ActiveView = 'Deployments'
 
@@ -481,11 +492,12 @@ $script:ViewMeta = @{
     'Clients'     = @{ Title = 'Client Health';        Subtitle = 'Per-device CCM health and active status. Requires SQL Server access (CM_<site> database).' }
     'Inactive'    = @{ Title = 'Inactive Devices';     Subtitle = 'Devices exceeding the inactivity threshold (configured in Options). SQL-backed.' }
     'Site'        = @{ Title = 'Site Health';          Subtitle = 'Site components (SMS_ComponentSummarizer) + site-system roles (SMS_SiteSystemSummarizer) in one rollup.' }
+    'Trends'      = @{ Title = 'Trends';               Subtitle = 'Rolling history per metric, captured at each completed refresh. Pick a metric and a 7 / 30 / 90 day range.' }
 }
 
 function Set-ActiveView {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates in-window Visibility + header text only.')]
-    param([Parameter(Mandatory)][ValidateSet('Deployments','Content','DPs','Clients','Inactive','Site')][string]$View)
+    param([Parameter(Mandatory)][ValidateSet('Deployments','Content','DPs','Clients','Inactive','Site','Trends')][string]$View)
 
     $script:ActiveView = $View
 
@@ -495,6 +507,7 @@ function Set-ActiveView {
     $viewClients.Visibility     = if ($View -eq 'Clients')     { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
     $viewInactive.Visibility    = if ($View -eq 'Inactive')    { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
     $viewSite.Visibility        = if ($View -eq 'Site')        { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    $viewTrends.Visibility      = if ($View -eq 'Trends')      { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
 
     $meta = $script:ViewMeta[$View]
     if ($meta) {
@@ -505,6 +518,7 @@ function Set-ActiveView {
     Update-SidebarButtonTheme
     Update-Filter
     Update-StatusBarSummary
+    if ($View -eq 'Trends') { Update-TrendChart }
 }
 
 $btnViewDeployments.Add_Click({ Set-ActiveView -View 'Deployments' })
@@ -513,6 +527,7 @@ $btnViewDPs.Add_Click({         Set-ActiveView -View 'DPs' })
 $btnViewClients.Add_Click({     Set-ActiveView -View 'Clients' })
 $btnViewInactive.Add_Click({    Set-ActiveView -View 'Inactive' })
 $btnViewSite.Add_Click({        Set-ActiveView -View 'Site' })
+$btnViewTrends.Add_Click({      Set-ActiveView -View 'Trends' })
 # btnOptions handler is wired below where Show-OptionsDialog is defined.
 
 # =============================================================================
@@ -547,7 +562,16 @@ $global:__writeCrash = {
 $window.Dispatcher.Add_UnhandledException({
     param($s, $e)
     & $global:__writeCrash 'DispatcherUnhandledException' $e.Exception
-    $e.Handled = $false
+    # PipelineStoppedException surfaces when a WPF event handler scriptblock
+    # runs while the host pipeline is being torn down (console closing,
+    # Ctrl+C, process kill during window close). Crashing on it is pure
+    # noise -- log it above and swallow. Everything else stays fatal so real
+    # bugs still produce a crash log + exit.
+    if ($e.Exception -is [System.Management.Automation.PipelineStoppedException]) {
+        $e.Handled = $true
+    } else {
+        $e.Handled = $false
+    }
 })
 
 [AppDomain]::CurrentDomain.Add_UnhandledException({
@@ -725,6 +749,7 @@ function ConvertTo-ClientGridRows {
             DeviceName         = $r.DeviceName
             HealthState        = $r.HealthState
             ActiveStatus       = $r.ActiveStatus
+            ClientState        = $r.ClientState
             LastOnlineDisplay  = Format-DateOrEmpty $r.LastOnlineTime
             LastDDRDisplay     = Format-DateOrEmpty $r.LastDDR
             LastPolicyDisplay  = Format-DateOrEmpty $r.LastPolicyRequest
@@ -857,6 +882,9 @@ function Update-Filter {
                 Where-Object { Test-RowMatches -Row $_ -Filter $statusFilter }
             $gridSite.ItemsSource = @($rows)
         }
+        'Trends' {
+            # No grid; text/status filters do not apply to the chart.
+        }
     }
 }
 
@@ -930,6 +958,7 @@ $gridClients.Add_SelectionChanged({
         ('Device:        {0}' -f $row.DeviceName),
         ('Health State:  {0}' -f $row.HealthState),
         ('Active:        {0}' -f $row.ActiveStatus),
+        ('Client State:  {0}' -f $row.ClientState),
         ('Client:        {0}' -f $row.ClientVersion),
         ('OS:            {0}' -f $row.OperatingSystem),
         '',
@@ -1008,6 +1037,253 @@ function Update-StatusBarSummary {
 }
 
 # =============================================================================
+# Trends view: metric history chart (pure WPF, no chart libs).
+# History rows are appended by the refresh completion path via
+# Add-MetricsHistoryEntry; this section only reads and draws.
+# =============================================================================
+$global:HistoryPath = Join-Path $PSScriptRoot 'History\metrics-history.csv'
+
+$script:TrendMetrics = @(
+    @{ Label = 'Deployment Compliance %';     Column = 'CompliancePct' },
+    @{ Label = 'Deployments With Errors';     Column = 'DeploymentFailed' },
+    @{ Label = 'Content Items With Issues';   Column = 'ContentIssues' },
+    @{ Label = 'Failed DP-Content Pairs';     Column = 'ContentFailedPairs' },
+    @{ Label = 'DPs Critical';                Column = 'DPOffline' },
+    @{ Label = 'DPs Degraded';                Column = 'DPDegraded' },
+    @{ Label = 'Unhealthy Clients';           Column = 'ClientUnhealthy' },
+    @{ Label = 'Inactive Devices';            Column = 'InactiveDevices' },
+    @{ Label = 'Site Items Critical';         Column = 'SiteCritical' }
+)
+
+foreach ($m in $script:TrendMetrics) {
+    $item = New-Object System.Windows.Controls.ComboBoxItem
+    $item.Content = $m.Label
+    $item.Tag     = $m.Column
+    [void]$cboTrendMetric.Items.Add($item)
+}
+$cboTrendMetric.SelectedIndex = 0
+
+$script:TrendLineBrush = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#0078D4')
+$script:TrendGridBrush = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#55808080')
+
+function Get-TrendRangeDays {
+    $sel = $cboTrendRange.SelectedItem
+    if ($sel -and ([string]$sel.Content) -match '^(\d+)') { return [int]$Matches[1] }
+    return 30
+}
+
+function Get-TrendLabelBrush {
+    $b = $window.TryFindResource('MahApps.Brushes.ThemeForeground')
+    if ($b) { return $b }
+    return [System.Windows.Media.Brushes]::Gray
+}
+
+function Add-TrendCanvasText {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Adds a TextBlock to the trend canvas.')]
+    param([string]$Text, [double]$X, [double]$Y, $Brush, [double]$FontSize = 10)
+    $tb = New-Object System.Windows.Controls.TextBlock
+    $tb.Text = $Text
+    $tb.FontSize = $FontSize
+    $tb.Foreground = $Brush
+    [System.Windows.Controls.Canvas]::SetLeft($tb, $X)
+    [System.Windows.Controls.Canvas]::SetTop($tb, $Y)
+    [void]$canvasTrend.Children.Add($tb)
+}
+
+function Add-TrendCanvasLine {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Adds a Line to the trend canvas.')]
+    param([double]$X1, [double]$Y1, [double]$X2, [double]$Y2, $Brush, [double]$Thickness = 1)
+    $ln = New-Object System.Windows.Shapes.Line
+    $ln.X1 = $X1; $ln.Y1 = $Y1; $ln.X2 = $X2; $ln.Y2 = $Y2
+    $ln.Stroke = $Brush
+    $ln.StrokeThickness = $Thickness
+    [void]$canvasTrend.Children.Add($ln)
+}
+
+function Update-TrendChart {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Redraws the in-window trend canvas from the history CSV.')]
+    param()
+
+    if (-not $canvasTrend) { return }
+    $canvasTrend.Children.Clear()
+
+    $sel = $cboTrendMetric.SelectedItem
+    if (-not $sel) {
+        $txtTrendEmpty.Visibility = [System.Windows.Visibility]::Visible
+        $txtTrendSummary.Text = ''
+        return
+    }
+    $column = [string]$sel.Tag
+    $label  = [string]$sel.Content
+    $days   = Get-TrendRangeDays
+
+    $rows = @(Get-MetricsHistory -HistoryPath $global:HistoryPath -Days $days)
+    $points = @(foreach ($r in $rows) {
+        $v = $r.$column
+        if ($null -ne $v -and '' -ne [string]$v) {
+            [PSCustomObject]@{ T = $r.TimestampValue; V = [double]$v }
+        }
+    })
+
+    if ($points.Count -lt 1) {
+        $txtTrendEmpty.Visibility = [System.Windows.Visibility]::Visible
+        $txtTrendSummary.Text = ''
+        return
+    }
+    $txtTrendEmpty.Visibility = [System.Windows.Visibility]::Collapsed
+
+    $w = $canvasTrend.ActualWidth
+    $h = $canvasTrend.ActualHeight
+    if ($w -lt 80 -or $h -lt 60) { return }   # Not laid out yet; SizeChanged redraws.
+
+    $marL = 48.0; $marR = 12.0; $marT = 10.0; $marB = 24.0
+    $plotW = $w - $marL - $marR
+    $plotH = $h - $marT - $marB
+
+    $vMin = ($points | Measure-Object -Property V -Minimum).Minimum
+    $vMax = ($points | Measure-Object -Property V -Maximum).Maximum
+    if ($vMax -eq $vMin) { $vMax = $vMin + 1 }
+    $t0 = $points[0].T.Ticks
+    $t1 = $points[-1].T.Ticks
+    $tSpan = [double]($t1 - $t0)
+
+    $labelBrush = Get-TrendLabelBrush
+
+    # Horizontal gridlines + value labels at 0 / 25 / 50 / 75 / 100 percent.
+    foreach ($frac in 0.0, 0.25, 0.5, 0.75, 1.0) {
+        $y = $marT + $plotH * (1.0 - $frac)
+        Add-TrendCanvasLine -X1 $marL -Y1 $y -X2 ($marL + $plotW) -Y2 $y -Brush $script:TrendGridBrush
+        $val = $vMin + ($vMax - $vMin) * $frac
+        Add-TrendCanvasText -Text ('{0:0.#}' -f $val) -X 4 -Y ($y - 7) -Brush $labelBrush
+    }
+
+    # X axis endpoint labels.
+    $fmt = if ($days -le 7) { 'MM-dd HH:mm' } else { 'yyyy-MM-dd' }
+    Add-TrendCanvasText -Text $points[0].T.ToString($fmt)  -X $marL -Y ($marT + $plotH + 6) -Brush $labelBrush
+    $endLabel = $points[-1].T.ToString($fmt)
+    Add-TrendCanvasText -Text $endLabel -X ($marL + $plotW - 6.0 * $endLabel.Length) -Y ($marT + $plotH + 6) -Brush $labelBrush
+
+    # Series.
+    $poly = New-Object System.Windows.Shapes.Polyline
+    $poly.Stroke = $script:TrendLineBrush
+    $poly.StrokeThickness = 2
+    $pc = New-Object System.Windows.Media.PointCollection
+    foreach ($p in $points) {
+        $x = if ($tSpan -gt 0) { $marL + $plotW * (($p.T.Ticks - $t0) / $tSpan) } else { $marL + $plotW / 2 }
+        $y = $marT + $plotH * (1.0 - (($p.V - $vMin) / ($vMax - $vMin)))
+        $pc.Add([System.Windows.Point]::new($x, $y))
+    }
+    $poly.Points = $pc
+    [void]$canvasTrend.Children.Add($poly)
+
+    # Point markers when the series is sparse enough to read them.
+    if ($points.Count -le 90) {
+        foreach ($pt in $pc) {
+            $dot = New-Object System.Windows.Shapes.Ellipse
+            $dot.Width = 5; $dot.Height = 5
+            $dot.Fill = $script:TrendLineBrush
+            [System.Windows.Controls.Canvas]::SetLeft($dot, $pt.X - 2.5)
+            [System.Windows.Controls.Canvas]::SetTop($dot, $pt.Y - 2.5)
+            [void]$canvasTrend.Children.Add($dot)
+        }
+    }
+
+    $vals = @($points | ForEach-Object { $_.V })
+    $stats = $vals | Measure-Object -Minimum -Maximum -Average
+    $txtTrendSummary.Text = ('{0}: {1} samples over {2} days   |   latest {3:0.#}   min {4:0.#}   max {5:0.#}   avg {6:0.#}' -f `
+        $label, $points.Count, $days, $points[-1].V, $stats.Minimum, $stats.Maximum, $stats.Average)
+}
+
+$cboTrendMetric.Add_SelectionChanged({ if ($script:ActiveView -eq 'Trends') { Update-TrendChart } })
+$cboTrendRange.Add_SelectionChanged({  if ($script:ActiveView -eq 'Trends') { Update-TrendChart } })
+$canvasTrend.Add_SizeChanged({         if ($script:ActiveView -eq 'Trends') { Update-TrendChart } })
+
+# =============================================================================
+# Alerts: threshold evaluation on each completed refresh. Transition-based
+# (fires when a metric crosses from OK into breach, not on every refresh
+# while it stays breached). Delivery is local-only per the roadmap: Windows
+# toast + Logs\HealthDash-alerts.log + the in-window log drawer.
+# =============================================================================
+$global:AlertLogPath = Join-Path $__txDir 'HealthDash-alerts.log'
+$script:AlertBreachState = @{}
+
+function Send-HdToast {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Shows a local toast notification.')]
+    param([Parameter(Mandatory)][string]$Title, [Parameter(Mandatory)][string]$Message)
+    try {
+        $null = [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+        $null = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime]
+
+        $tTitle = [System.Security.SecurityElement]::Escape($Title)
+        $tMsg   = [System.Security.SecurityElement]::Escape($Message)
+        $xmlText = "<toast><visual><binding template=""ToastGeneric""><text>$tTitle</text><text>$tMsg</text></binding></visual></toast>"
+
+        $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+        $xml.LoadXml($xmlText)
+        $toast = New-Object Windows.UI.Notifications.ToastNotification -ArgumentList $xml
+
+        # PowerShell's registered AppUserModelID -- standard host for
+        # script-generated toasts on Windows 10/11.
+        $appId = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($appId).Show($toast)
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Write-AlertEntry {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Appends to the alert audit log and log drawer; sends a toast.')]
+    param([Parameter(Mandatory)][string]$Message)
+    $line = '[{0}] {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
+    try { Add-Content -LiteralPath $global:AlertLogPath -Value $line -Encoding UTF8 } catch { $null = $_ }
+    Add-LogLine ('ALERT: {0}' -f $Message) -Level WARN
+    if (-not (Send-HdToast -Title 'MECM Health Dashboard' -Message $Message)) {
+        Add-LogLine 'Toast delivery unavailable; alert recorded in HealthDash-alerts.log only.' -Level WARN
+    }
+}
+
+function Invoke-AlertEvaluation {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Evaluates thresholds and emits transition alerts.')]
+    param()
+
+    if (-not [bool]$global:Prefs.AlertsEnabled) { return }
+
+    $complianceFloor = [int]$global:Prefs.AlertCompliancePct
+
+    # Each rule: key for transition tracking, breached flag, message.
+    $rules = @()
+    if ($script:SiteCounts) {
+        $rules += @{ Key = 'SiteCritical'
+                     Breached = ([int]$script:SiteCounts.CriticalCount -gt 0)
+                     Message  = ('Site health: {0} component / site-system item(s) critical.' -f $script:SiteCounts.CriticalCount) }
+    }
+    if ($script:DPCounts) {
+        $rules += @{ Key = 'DPCritical'
+                     Breached = ([int]$script:DPCounts.OfflineCount -gt 0)
+                     Message  = ('{0} distribution point(s) in critical state.' -f $script:DPCounts.OfflineCount) }
+    }
+    if ($script:ContentCounts) {
+        $rules += @{ Key = 'FailedContent'
+                     Breached = ([int]$script:ContentCounts.TotalFailedPairs -gt 0)
+                     Message  = ('{0} failed DP-content pair(s).' -f $script:ContentCounts.TotalFailedPairs) }
+    }
+    if ($script:DeploymentCounts -and [int]$script:DeploymentCounts.TotalDeployments -gt 0) {
+        $rules += @{ Key = 'Compliance'
+                     Breached = ([double]$script:DeploymentCounts.OverallCompliance -lt $complianceFloor)
+                     Message  = ('Overall deployment compliance {0}% is below the {1}% floor.' -f $script:DeploymentCounts.OverallCompliance, $complianceFloor) }
+    }
+
+    foreach ($r in $rules) {
+        $wasBreached = [bool]$script:AlertBreachState[$r.Key]
+        if ($r.Breached -and -not $wasBreached) {
+            Write-AlertEntry -Message $r.Message
+        }
+        $script:AlertBreachState[$r.Key] = [bool]$r.Breached
+    }
+}
+
+# =============================================================================
 # Background refresh runspace. The six health queries run sequentially in a
 # STA runspace so the UI stays responsive and the progress overlay animates.
 # =============================================================================
@@ -1056,14 +1332,18 @@ function Invoke-RefreshAll {
         return
     }
 
+    # One refresh at a time. Stopping an in-flight pipeline blocks the UI
+    # thread until the CIM/SQL call aborts, so just ignore re-entrant calls
+    # (the Refresh button is disabled during a refresh; this also covers the
+    # auto-timer racing a manual refresh).
+    if ($script:BgPowerShell) {
+        Add-LogLine 'Refresh already in progress; ignoring.' -Level WARN
+        return
+    }
+
     Initialize-RefreshRunspace
 
     if ($script:RefreshTimer) { try { $script:RefreshTimer.Stop() } catch { $null = $_ } }
-    if ($script:BgPowerShell) {
-        try { [void]$script:BgPowerShell.Stop() } catch { $null = $_ }
-        try { $script:BgPowerShell.Dispose() }   catch { $null = $_ }
-        $script:BgPowerShell = $null
-    }
 
     # Pause auto-refresh ticking while a refresh runs.
     if ($script:AutoTimer) { $script:AutoTimer.Stop() }
@@ -1215,6 +1495,17 @@ function Invoke-RefreshAll {
 
             $script:LastRefreshTime = Get-Date
 
+            # Trend history + threshold alerts run on every completed refresh.
+            Add-MetricsHistoryEntry -HistoryPath $global:HistoryPath `
+                -DeploymentCounts $script:DeploymentCounts `
+                -ContentCounts    $script:ContentCounts `
+                -DPCounts         $script:DPCounts `
+                -ClientCounts     $script:ClientCounts `
+                -InactiveCounts   $script:InactiveCounts `
+                -SiteCounts       $script:SiteCounts
+            Invoke-AlertEvaluation
+            if ($script:ActiveView -eq 'Trends') { Update-TrendChart }
+
             Update-Filter
             Update-StatusBarSummary
 
@@ -1355,6 +1646,7 @@ function Show-OptionsDialog {
             <StackPanel>
                 <Button x:Name="btnCatConnection" Content="Connection" Style="{StaticResource CategoryRowStyle}"/>
                 <Button x:Name="btnCatRefresh"    Content="Refresh"    Style="{StaticResource CategoryRowStyle}"/>
+                <Button x:Name="btnCatAlerts"     Content="Alerts"     Style="{StaticResource CategoryRowStyle}"/>
                 <Button x:Name="btnCatAbout"      Content="About"      Style="{StaticResource CategoryRowStyle}"/>
             </StackPanel>
         </Border>
@@ -1408,9 +1700,27 @@ function Show-OptionsDialog {
                 <TextBlock Style="{StaticResource OptHint}" Text="Devices with no DDR contact in this many days appear in the Inactive Devices view."/>
             </StackPanel>
 
+            <StackPanel x:Name="paneAlerts" Visibility="Collapsed">
+                <TextBlock Text="Alerts" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10"/>
+
+                <CheckBox x:Name="chkAlertsEnabled" Content="Enable threshold alerts" FontSize="12" Margin="0,4,0,0"/>
+                <TextBlock Style="{StaticResource OptHint}"
+                           Text="On each completed refresh, alerts fire when a metric crosses into breach: any critical site component / site system, any critical distribution point, any failed DP-content pair, or overall deployment compliance below the floor. Alerts repeat only after the metric recovers and breaches again."/>
+
+                <TextBlock Style="{StaticResource OptLabel}" Text="Deployment compliance floor (%)"/>
+                <ComboBox x:Name="cboAlertCompliance" Width="160" HorizontalAlignment="Left" FontSize="12">
+                    <ComboBoxItem Content="70"/>
+                    <ComboBoxItem Content="80"/>
+                    <ComboBoxItem Content="90"/>
+                    <ComboBoxItem Content="95"/>
+                </ComboBox>
+                <TextBlock Style="{StaticResource OptHint}"
+                           Text="Delivery is local-only: a Windows toast notification plus an audit line in Logs\HealthDash-alerts.log and the log drawer. No email / webhook / Teams."/>
+            </StackPanel>
+
             <StackPanel x:Name="paneAbout" Visibility="Collapsed">
                 <TextBlock Text="About" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                <TextBlock Text="MECM Health Dashboard v1.0.0" FontSize="13" FontWeight="SemiBold"/>
+                <TextBlock Text="MECM Health Dashboard v1.1.0" FontSize="13" FontWeight="SemiBold"/>
                 <TextBlock Text="Single-pane environmental health for MECM sites: deployments, content distribution, distribution points, client health, inactive devices, and site components / systems. Glyph-only status indicators; no red / yellow / green coloring."
                            FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/>
                 <TextBlock Text="PowerShell 5.1 + WPF (MahApps.Metro). Data layer: ConfigurationManager cmdlets + WMI summarizers + Invoke-Sqlcmd against the CM_&lt;site&gt; database."
@@ -1447,15 +1757,19 @@ function Show-OptionsDialog {
 
     $btnCatConnection = $dlg.FindName('btnCatConnection')
     $btnCatRefresh    = $dlg.FindName('btnCatRefresh')
+    $btnCatAlerts     = $dlg.FindName('btnCatAlerts')
     $btnCatAbout      = $dlg.FindName('btnCatAbout')
     $paneConnection   = $dlg.FindName('paneConnection')
     $paneRefresh      = $dlg.FindName('paneRefresh')
+    $paneAlerts       = $dlg.FindName('paneAlerts')
     $paneAbout        = $dlg.FindName('paneAbout')
     $txtSiteCode      = $dlg.FindName('txtSiteCode')
     $txtSmsProvider   = $dlg.FindName('txtSmsProvider')
     $txtSqlServer     = $dlg.FindName('txtSqlServer')
     $cboRefreshInterval = $dlg.FindName('cboRefreshInterval')
     $cboInactiveDays    = $dlg.FindName('cboInactiveDays')
+    $chkAlertsEnabled   = $dlg.FindName('chkAlertsEnabled')
+    $cboAlertCompliance = $dlg.FindName('cboAlertCompliance')
     $btnOk            = $dlg.FindName('btnOk')
     $btnCancel        = $dlg.FindName('btnCancel')
 
@@ -1476,19 +1790,35 @@ function Show-OptionsDialog {
     }
     if (-not $cboInactiveDays.SelectedItem) { $cboInactiveDays.SelectedIndex = 1 }
 
+    $chkAlertsEnabled.IsChecked = [bool]$global:Prefs.AlertsEnabled
+    $floor = [string][int]$global:Prefs.AlertCompliancePct
+    foreach ($i in $cboAlertCompliance.Items) {
+        if ([string]$i.Content -eq $floor) { $cboAlertCompliance.SelectedItem = $i; break }
+    }
+    if (-not $cboAlertCompliance.SelectedItem) { $cboAlertCompliance.SelectedIndex = 1 }
+
     $btnCatConnection.Add_Click({
         $paneConnection.Visibility = [System.Windows.Visibility]::Visible
         $paneRefresh.Visibility    = [System.Windows.Visibility]::Collapsed
+        $paneAlerts.Visibility     = [System.Windows.Visibility]::Collapsed
         $paneAbout.Visibility      = [System.Windows.Visibility]::Collapsed
     })
     $btnCatRefresh.Add_Click({
         $paneConnection.Visibility = [System.Windows.Visibility]::Collapsed
         $paneRefresh.Visibility    = [System.Windows.Visibility]::Visible
+        $paneAlerts.Visibility     = [System.Windows.Visibility]::Collapsed
+        $paneAbout.Visibility      = [System.Windows.Visibility]::Collapsed
+    })
+    $btnCatAlerts.Add_Click({
+        $paneConnection.Visibility = [System.Windows.Visibility]::Collapsed
+        $paneRefresh.Visibility    = [System.Windows.Visibility]::Collapsed
+        $paneAlerts.Visibility     = [System.Windows.Visibility]::Visible
         $paneAbout.Visibility      = [System.Windows.Visibility]::Collapsed
     })
     $btnCatAbout.Add_Click({
         $paneConnection.Visibility = [System.Windows.Visibility]::Collapsed
         $paneRefresh.Visibility    = [System.Windows.Visibility]::Collapsed
+        $paneAlerts.Visibility     = [System.Windows.Visibility]::Collapsed
         $paneAbout.Visibility      = [System.Windows.Visibility]::Visible
     })
 
@@ -1498,6 +1828,8 @@ function Show-OptionsDialog {
         $newSql      = ([string]$txtSqlServer.Text).Trim()
         $newMinutes  = if ($cboRefreshInterval.SelectedItem) { [int]([string]$cboRefreshInterval.SelectedItem.Content) } else { 15 }
         $newDays     = if ($cboInactiveDays.SelectedItem)    { [int]([string]$cboInactiveDays.SelectedItem.Content) }    else { 14 }
+        $newAlertsOn = [bool]$chkAlertsEnabled.IsChecked
+        $newFloor    = if ($cboAlertCompliance.SelectedItem) { [int]([string]$cboAlertCompliance.SelectedItem.Content) } else { 80 }
 
         $connectionChanged = ($newSite -ne [string]$global:Prefs.SiteCode) -or
                              ($newProvider -ne [string]$global:Prefs.SMSProvider) -or
@@ -1508,6 +1840,8 @@ function Show-OptionsDialog {
         $global:Prefs.SQLServer             = $newSql
         $global:Prefs.AutoRefreshMinutes    = $newMinutes
         $global:Prefs.InactiveThresholdDays = $newDays
+        $global:Prefs.AlertsEnabled         = $newAlertsOn
+        $global:Prefs.AlertCompliancePct    = $newFloor
         Save-HdPreferences -Prefs $global:Prefs
         Add-LogLine ('Options saved: site={0} provider={1} sql={2} interval={3}m threshold={4}d' -f $newSite, $newProvider, $(if ($newSql) { $newSql } else { '(none)' }), $newMinutes, $newDays)
 
@@ -1520,13 +1854,13 @@ function Show-OptionsDialog {
                 $script:RefreshTimer = $null
             }
             if ($script:BgPowerShell) {
-                try { [void]$script:BgPowerShell.Stop() } catch { $null = $_ }
-                try { $script:BgPowerShell.Dispose() }   catch { $null = $_ }
+                # Async stop/close: a synchronous Stop on a pipeline blocked
+                # in a CIM/SQL call would freeze the UI thread here.
+                try { [void]$script:BgPowerShell.BeginStop($null, $null) } catch { $null = $_ }
                 $script:BgPowerShell = $null
             }
             if ($script:BgRunspace) {
-                try { $script:BgRunspace.Close() }  catch { $null = $_ }
-                try { $script:BgRunspace.Dispose() } catch { $null = $_ }
+                try { $script:BgRunspace.CloseAsync() } catch { $null = $_ }
                 $script:BgRunspace = $null
             }
             $script:BgInvokeHandle      = $null
@@ -1626,6 +1960,25 @@ function Get-ActiveExportInfo {
                 Name    = 'SiteHealth'
                 Columns = @('Name','ItemType','MachineName','Status','State','LastStartedDisplay')
                 Rows    = $gridSite.ItemsSource
+            }
+        }
+        'Trends' {
+            # Export the currently charted series.
+            $sel = $cboTrendMetric.SelectedItem
+            if (-not $sel) { return $null }
+            $column = [string]$sel.Tag
+            $rows = @(Get-MetricsHistory -HistoryPath $global:HistoryPath -Days (Get-TrendRangeDays)) |
+                Where-Object { $null -ne $_.$column -and '' -ne [string]$_.$column } |
+                ForEach-Object {
+                    [PSCustomObject]@{
+                        Timestamp = $_.TimestampValue.ToString('yyyy-MM-dd HH:mm:ss')
+                        Value     = $_.$column
+                    }
+                }
+            return @{
+                Name    = ('Trends-{0}' -f ($column -replace '[^A-Za-z0-9]', ''))
+                Columns = @('Timestamp','Value')
+                Rows    = @($rows)
             }
         }
         default { return $null }
@@ -1736,7 +2089,7 @@ function Restore-WindowState {
             $window.Height = [Math]::Max($window.MinHeight, $h)
         }
 
-        if ($s.ActiveView -in @('Deployments','Content','DPs','Clients','Inactive','Site')) {
+        if ($s.ActiveView -in @('Deployments','Content','DPs','Clients','Inactive','Site','Trends')) {
             Set-ActiveView -View ([string]$s.ActiveView)
         } elseif ($null -ne $s.ActiveTab) {
             # WinForms 1.0.x stored the tab index. Map it onto the WPF view
@@ -1752,18 +2105,25 @@ function Restore-WindowState {
 }
 
 $window.Add_Closing({
-    Save-WindowState
-    Stop-AutoRefresh
-    if ($script:RefreshTimer) { try { $script:RefreshTimer.Stop() } catch { $null = $_ } }
-    if ($script:BgPowerShell) {
-        try { [void]$script:BgPowerShell.Stop() } catch { $null = $_ }
-        try { $script:BgPowerShell.Dispose() }   catch { $null = $_ }
+    # Entire body is guarded: this handler runs during teardown, where the
+    # host pipeline may already be stopping (see the crash log from
+    # 2026-05-01 -- PipelineStoppedException out of MetroWindow.OnClosing).
+    # Nothing in here is worth blocking or crashing the close for.
+    try {
+        Save-WindowState
+        Stop-AutoRefresh
+        if ($script:RefreshTimer) { try { $script:RefreshTimer.Stop() } catch { $null = $_ } }
+        if ($script:BgPowerShell) {
+            # BeginStop, not Stop: a pipeline blocked in a long CIM/SQL call
+            # can take seconds to abort, and this runs on the UI thread.
+            try { [void]$script:BgPowerShell.BeginStop($null, $null) } catch { $null = $_ }
+        }
+        if ($script:BgRunspace) {
+            try { $script:BgRunspace.CloseAsync() } catch { $null = $_ }
+        }
+    } catch {
+        try { & $global:__writeCrash 'ClosingHandler' $_.Exception } catch { $null = $_ }
     }
-    if ($script:BgRunspace) {
-        try { $script:BgRunspace.Close() }  catch { $null = $_ }
-        try { $script:BgRunspace.Dispose() } catch { $null = $_ }
-    }
-    if (Test-CMConnection) { try { Disconnect-CMSite } catch { $null = $_ } }
 })
 
 $window.Add_Loaded({
@@ -1781,6 +2141,14 @@ $window.Add_Loaded({
 
     Update-StatusBarSummary
     Add-LogLine 'MECM Health Dashboard ready. Configure Site / Provider in Options, then click Refresh All.'
+
+    # Arm the auto-refresh timer from launch when a site is already
+    # configured -- previously it only started after the first manual
+    # refresh, so a relaunched dashboard sat idle despite the configured
+    # interval.
+    if ($global:Prefs.SiteCode -and $global:Prefs.SMSProvider) {
+        Start-AutoRefreshIfEnabled
+    }
 })
 
 # =============================================================================

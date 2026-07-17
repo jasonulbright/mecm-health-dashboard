@@ -144,9 +144,9 @@ function Connect-CMSite {
         $site = Get-CMSite -SiteCode $SiteCode -ErrorAction Stop
         Write-Log "Connected to site $SiteCode ($($site.SiteName))"
 
-        # Remove default query result cap (often 1000) so large environments return all rows
-        Set-CMQueryResultMaximum -Maximum 0 -ErrorAction SilentlyContinue
-        Write-Log "Set CM query result limit to unlimited"
+        # No Set-CMQueryResultMaximum call: the current cmdlet library is
+        # unbounded by default (see Get-CMQueryResultMaximum docs), and the
+        # semantics of -Maximum 0 are undocumented.
 
         $script:ConnectedSiteCode    = $SiteCode
         $script:ConnectedSMSProvider = $SMSProvider
@@ -236,24 +236,40 @@ function Get-DeploymentHealth {
         $unknown    = [int]$d.NumberUnknown
         $pctCompliant = if ($targeted -gt 0) { [math]::Round(($success / $targeted) * 100, 1) } else { 0 }
 
-        $deployType = switch ($d.FeatureType) {
-            1 { 'Application' }
-            2 { 'Package' }
-            5 { 'Software Update' }
-            7 { 'Baseline' }
-            8 { 'Task Sequence' }
+        # SMS_DeploymentSummary.FeatureType values per
+        # learn.microsoft.com/intune/configmgr/develop/reference/apps/sms_deploymentsummary-server-wmi-class
+        $deployType = switch ([int]$d.FeatureType) {
+            1  { 'Application' }
+            2  { 'Program' }
+            3  { 'Mobile Program' }
+            4  { 'Script' }
+            5  { 'Software Update' }
+            6  { 'Baseline' }
+            7  { 'Task Sequence' }
+            8  { 'Content Distribution' }
+            9  { 'DP Group' }
+            10 { 'DP Health' }
+            11 { 'Configuration Policy' }
             default { "Other ($($d.FeatureType))" }
         }
 
-        $purpose = switch ($d.DeploymentIntent) {
+        # DeploymentIntent values per SMS_AppDeploymentAssetDetails.
+        $purpose = switch ([int]$d.DeploymentIntent) {
             1 { 'Required' }
             2 { 'Available' }
+            3 { 'Simulate' }
             default { 'Unknown' }
         }
 
+        # SoftwareName is populated for every deployment type; ApplicationName
+        # only for application deployments.
+        $name = if ($d.SoftwareName) { $d.SoftwareName }
+                elseif ($d.ApplicationName) { $d.ApplicationName }
+                else { $d.DeploymentID }
+
         [PSCustomObject]@{
             DeploymentId    = $d.DeploymentID
-            DeploymentName  = $d.ApplicationName
+            DeploymentName  = $name
             DeploymentType  = $deployType
             CollectionName  = $d.CollectionName
             Purpose         = $purpose
@@ -274,6 +290,10 @@ function Get-DeploymentDetails {
     <#
     .SYNOPSIS
         Returns per-device status for a specific deployment.
+    .DESCRIPTION
+        Get-CMDeploymentStatusDetails only accepts -InputObject (a per-state
+        status object), so the chain is: Get-CMDeployment -DeploymentId ->
+        feature-type-specific status cmdlet -> Get-CMDeploymentStatusDetails.
     #>
     param(
         [Parameter(Mandatory)][string]$DeploymentId
@@ -282,24 +302,48 @@ function Get-DeploymentDetails {
     Write-Log "Querying deployment details for $DeploymentId..."
 
     try {
-        $details = Get-CMDeploymentStatusDetails -DeploymentID $DeploymentId -ErrorAction Stop
+        $deployment = Get-CMDeployment -DeploymentId $DeploymentId -ErrorAction Stop
+        if (-not $deployment) {
+            Write-Log "Deployment $DeploymentId not found" -Level WARN
+            return @()
+        }
 
-        $results = foreach ($d in $details) {
+        # Pick the status cmdlet for the feature type (SMS_DeploymentSummary.FeatureType).
+        $statusRows = switch ([int]$deployment.FeatureType) {
+            1       { Get-CMApplicationDeploymentStatus -InputObject $deployment -ErrorAction Stop }
+            5       { Get-CMSoftwareUpdateDeploymentStatus -InputObject $deployment -ErrorAction Stop }
+            6       { Get-CMBaselineDeploymentStatus -InputObject $deployment -ErrorAction Stop }
+            default { Get-CMPackageDeploymentStatus -DeploymentId $DeploymentId -ErrorAction Stop }
+        }
+
+        $details = @($statusRows) | Where-Object { $_ } |
+            Get-CMDeploymentStatusDetails -ErrorAction Stop
+
+        $results = foreach ($d in @($details)) {
+            $device = if ($d.PSObject.Properties['DeviceName'] -and $d.DeviceName) { $d.DeviceName }
+                      elseif ($d.PSObject.Properties['MachineName']) { $d.MachineName }
+                      else { '' }
+            $statusType = if ($d.PSObject.Properties['AppStatusType']) { [int]$d.AppStatusType }
+                          elseif ($d.PSObject.Properties['StatusType']) { [int]$d.StatusType }
+                          else { 4 }
+
             [PSCustomObject]@{
-                DeviceName     = $d.DeviceName
-                StatusType     = $d.StatusType
-                StatusDescription = switch ([int]$d.StatusType) {
+                DeviceName        = $device
+                StatusType        = $statusType
+                # AppStatusType values per SMS_AppDeploymentAssetDetails.
+                StatusDescription = switch ($statusType) {
                     1 { 'Success' }
                     2 { 'In Progress' }
+                    3 { 'Requirements Not Met' }
                     4 { 'Unknown' }
                     5 { 'Error' }
-                    default { "Status $($d.StatusType)" }
+                    default { "Status $statusType" }
                 }
-                LastStatusTime = $d.SummarizationTime
+                LastStatusTime    = if ($d.PSObject.Properties['StatusTime']) { $d.StatusTime } else { $null }
             }
         }
 
-        Write-Log "Retrieved $($results.Count) device status records"
+        Write-Log "Retrieved $(@($results).Count) device status records"
         return $results
     }
     catch {
@@ -360,11 +404,15 @@ function Get-ContentDistributionHealth {
         }
         $byPackage[$pkgId].TotalDPs++
 
-        switch ($row.State) {
+        # State values per SMS_PackageStatusDistPointsSummarizer:
+        # 0 INSTALLED, 1 INSTALL_PENDING, 2 INSTALL_RETRYING, 3 INSTALL_FAILED,
+        # 4 REMOVAL_PENDING, 5 REMOVAL_RETRYING, 6 REMOVAL_FAILED,
+        # 7 CONTENT_UPDATING, 8 CONTENT_MONITORING.
+        switch ([int]$row.State) {
             0       { $byPackage[$pkgId].Installed++ }
             8       { $byPackage[$pkgId].Installed++ }
-            { $_ -in 1, 2, 7 } { $byPackage[$pkgId].InProgress++ }
-            { $_ -in 3, 6 }    { $byPackage[$pkgId].Failed++ }
+            { $_ -in 1, 2, 4, 5, 7 } { $byPackage[$pkgId].InProgress++ }
+            { $_ -in 3, 6 }          { $byPackage[$pkgId].Failed++ }
         }
     }
 
@@ -436,11 +484,15 @@ function Get-ContentNameMap {
             -OperationTimeoutSec 0 -ErrorAction Stop
 
         foreach ($p in $packages) {
+            # PackageType values per SMS_PackageBaseclass.
             $typeName = switch ([int]$p.PackageType) {
                 0   { 'Package' }
                 3   { 'Driver Package' }
                 4   { 'Task Sequence' }
                 5   { 'Software Update' }
+                6   { 'Device Setting' }
+                7   { 'Virtual App' }
+                8   { 'Application' }
                 257 { 'OS Image' }
                 258 { 'Boot Image' }
                 259 { 'OS Upgrade' }
@@ -484,6 +536,8 @@ function Get-DPHealth {
         -Filter "Role = 'SMS Distribution Point'" `
         -OperationTimeoutSec 0 -ErrorAction SilentlyContinue
 
+    # SMS_SiteSystemSummarizer has one instance per storage object, so a DP
+    # server can appear multiple times -- keep the worst (highest) status.
     $statusLookup = @{}
     if ($sysStatus) {
         foreach ($ss in $sysStatus) {
@@ -492,7 +546,10 @@ function Get-DPHealth {
                 $name = $Matches[1].ToUpper()
             }
             if ($name) {
-                $statusLookup[$name] = [int]$ss.Status
+                $val = [int]$ss.Status
+                if (-not $statusLookup.ContainsKey($name) -or $val -gt $statusLookup[$name]) {
+                    $statusLookup[$name] = $val
+                }
             }
         }
     }
@@ -504,7 +561,14 @@ function Get-DPHealth {
         }
 
         $siteCode = $dp.SiteCode
-        $isPullDP = if ($dp.IsPullDP) { 'Yes' } else { 'No' }
+
+        # IsPullDP is not a top-level property on SMS_SCI_SysResUse; it lives
+        # in the embedded Props array.
+        $isPullDP = 'No'
+        try {
+            $pullProp = @($dp.Props) | Where-Object { $_.PropertyName -eq 'IsPullDP' } | Select-Object -First 1
+            if ($pullProp -and [int]$pullProp.Value -ne 0) { $isPullDP = 'Yes' }
+        } catch { $null = $_ }
 
         $statusVal = if ($statusLookup.ContainsKey($serverName)) { $statusLookup[$serverName] } else { -1 }
         $statusText = switch ($statusVal) {
@@ -579,17 +643,21 @@ function Get-ClientHealthSummary {
 
     Write-Log "Querying client health from SQL ($SQLServer)..."
 
+    # v_CH_ClientSummary has no HealthState or LastOnline column. Health
+    # pass/fail comes from LastEvaluationHealthy (1 pass, 2 fail, 3/NULL
+    # unknown) and the activity timestamp is LastActiveTime.
     $dbName = "CM_$SiteCode"
     $query = @(
         "SELECT",
         "    sys.Name0 AS DeviceName,",
-        "    ISNULL(ch.HealthState, 0) AS HealthState,",
+        "    ISNULL(ch.LastEvaluationHealthy, 3) AS LastEvaluationHealthy,",
         "    ISNULL(ch.ClientActiveStatus, 0) AS ClientActiveStatus,",
-        "    ch.LastOnline AS LastOnlineTime,",
+        "    ch.LastActiveTime,",
         "    ch.LastDDR,",
         "    ch.LastPolicyRequest,",
         "    ch.LastHW AS LastHWInventory,",
         "    ch.LastHealthEvaluation,",
+        "    ch.ClientStateDescription,",
         "    sys.Client_Version0 AS ClientVersion,",
         "    sys.Operating_System_Name_and0 AS OperatingSystem",
         "FROM v_CH_ClientSummary ch",
@@ -601,7 +669,8 @@ function Get-ClientHealthSummary {
         $rows = Invoke-Sqlcmd -ServerInstance $SQLServer -Database $dbName -Query $query -QueryTimeout 0 -ErrorAction Stop
 
         $results = foreach ($r in $rows) {
-            $healthText = switch ([int]$r.HealthState) {
+            $healthVal = [int]$r.LastEvaluationHealthy
+            $healthText = switch ($healthVal) {
                 1 { 'Healthy' }
                 2 { 'Unhealthy' }
                 default { 'Unknown' }
@@ -615,14 +684,15 @@ function Get-ClientHealthSummary {
             [PSCustomObject]@{
                 DeviceName          = $r.DeviceName
                 HealthState         = $healthText
-                HealthStateValue    = [int]$r.HealthState
+                HealthStateValue    = $healthVal
                 ActiveStatus        = $activeText
                 ActiveStatusValue   = [int]$r.ClientActiveStatus
-                LastOnlineTime      = $r.LastOnlineTime
+                LastOnlineTime      = $r.LastActiveTime
                 LastDDR             = $r.LastDDR
                 LastPolicyRequest   = $r.LastPolicyRequest
                 LastHWInventory     = $r.LastHWInventory
                 LastHealthEvaluation = $r.LastHealthEvaluation
+                ClientState         = [string]$r.ClientStateDescription
                 ClientVersion       = $r.ClientVersion
                 OperatingSystem     = $r.OperatingSystem
             }
@@ -674,19 +744,21 @@ function Get-InactiveDevices {
 
     Write-Log "Querying inactive devices (threshold: $ThresholdDays days)..."
 
+    # v_CH_ClientSummary has no LastOnline column; LastActiveTime is the
+    # activity timestamp. COALESCE covers clients that never sent a DDR.
     $dbName = "CM_$SiteCode"
     $query = @(
         "SELECT",
         "    sys.Name0 AS DeviceName,",
-        "    ch.LastOnline AS LastOnlineTime,",
+        "    ch.LastActiveTime,",
         "    ch.LastDDR,",
-        "    DATEDIFF(day, ch.LastDDR, GETDATE()) AS DaysSinceContact,",
+        "    DATEDIFF(day, COALESCE(ch.LastDDR, ch.LastActiveTime), GETDATE()) AS DaysSinceContact,",
         "    sys.Operating_System_Name_and0 AS OperatingSystem,",
         "    sys.Client_Version0 AS ClientVersion",
         "FROM v_CH_ClientSummary ch",
         "JOIN v_R_System sys ON ch.ResourceID = sys.ResourceID",
         "WHERE sys.Client0 = 1",
-        "  AND DATEDIFF(day, ch.LastDDR, GETDATE()) > $ThresholdDays",
+        "  AND DATEDIFF(day, COALESCE(ch.LastDDR, ch.LastActiveTime), GETDATE()) > $ThresholdDays",
         "ORDER BY DaysSinceContact DESC"
     ) -join "`r`n"
 
@@ -696,7 +768,7 @@ function Get-InactiveDevices {
         $results = foreach ($r in $rows) {
             [PSCustomObject]@{
                 DeviceName       = $r.DeviceName
-                LastOnlineTime   = $r.LastOnlineTime
+                LastOnlineTime   = $r.LastActiveTime
                 LastDDR          = $r.LastDDR
                 DaysSinceContact = [int]$r.DaysSinceContact
                 OperatingSystem  = $r.OperatingSystem
@@ -858,6 +930,110 @@ function Get-SiteHealthCounts {
         OKCount       = $ok
         WarningCount  = $warning
         CriticalCount = $critical
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Metrics history (feeds the Trends view)
+# ---------------------------------------------------------------------------
+
+function Add-MetricsHistoryEntry {
+    <#
+    .SYNOPSIS
+        Appends one snapshot row of health counts to the metrics history CSV.
+    .DESCRIPTION
+        One row per completed refresh. Rows older than 180 days are pruned on
+        write so the file stays bounded. Any count object may be $null (e.g.
+        SQL views skipped); those columns are recorded empty.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Appends one row to the app-local history CSV.')]
+    param(
+        [Parameter(Mandatory)][string]$HistoryPath,
+        [PSCustomObject]$DeploymentCounts,
+        [PSCustomObject]$ContentCounts,
+        [PSCustomObject]$DPCounts,
+        [PSCustomObject]$ClientCounts,
+        [PSCustomObject]$InactiveCounts,
+        [PSCustomObject]$SiteCounts
+    )
+
+    try {
+        $parentDir = Split-Path -Path $HistoryPath -Parent
+        if ($parentDir -and -not (Test-Path -LiteralPath $parentDir)) {
+            New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+        }
+
+        $row = [PSCustomObject]@{
+            Timestamp          = (Get-Date).ToString('o')
+            DeploymentTotal    = if ($DeploymentCounts) { [int]$DeploymentCounts.TotalDeployments }  else { '' }
+            DeploymentFailed   = if ($DeploymentCounts) { [int]$DeploymentCounts.FailedDeployments } else { '' }
+            CompliancePct      = if ($DeploymentCounts) { [double]$DeploymentCounts.OverallCompliance } else { '' }
+            ContentIssues      = if ($ContentCounts)    { [int]$ContentCounts.TotalContentWithIssues } else { '' }
+            ContentFailedPairs = if ($ContentCounts)    { [int]$ContentCounts.TotalFailedPairs }     else { '' }
+            DPTotal            = if ($DPCounts)         { [int]$DPCounts.TotalDPs }                  else { '' }
+            DPOffline          = if ($DPCounts)         { [int]$DPCounts.OfflineCount }              else { '' }
+            DPDegraded         = if ($DPCounts)         { [int]$DPCounts.DegradedCount }             else { '' }
+            ClientHealthy      = if ($ClientCounts)     { [int]$ClientCounts.HealthyCount }          else { '' }
+            ClientUnhealthy    = if ($ClientCounts)     { [int]$ClientCounts.UnhealthyCount }        else { '' }
+            ClientInactive     = if ($ClientCounts)     { [int]$ClientCounts.InactiveCount }         else { '' }
+            InactiveDevices    = if ($InactiveCounts)   { [int]$InactiveCounts.InactiveCount }       else { '' }
+            SiteOK             = if ($SiteCounts)       { [int]$SiteCounts.OKCount }                 else { '' }
+            SiteWarning        = if ($SiteCounts)       { [int]$SiteCounts.WarningCount }            else { '' }
+            SiteCritical       = if ($SiteCounts)       { [int]$SiteCounts.CriticalCount }           else { '' }
+        }
+
+        $writeHeader = -not (Test-Path -LiteralPath $HistoryPath)
+        $csvLines = @($row | ConvertTo-Csv -NoTypeInformation)
+        if ($writeHeader) {
+            Set-Content -LiteralPath $HistoryPath -Value $csvLines -Encoding UTF8
+        } else {
+            Add-Content -LiteralPath $HistoryPath -Value $csvLines[1] -Encoding UTF8
+        }
+
+        # Prune rows older than 180 days (header preserved). Cheap at this
+        # cadence: worst case ~17k rows at a 15-minute refresh interval.
+        $cutoff = (Get-Date).AddDays(-180)
+        $all = @(Import-Csv -LiteralPath $HistoryPath)
+        $kept = @($all | Where-Object {
+            $ts = $_.Timestamp -as [datetime]
+            $ts -and $ts -ge $cutoff
+        })
+        if ($kept.Count -lt $all.Count) {
+            $kept | Export-Csv -LiteralPath $HistoryPath -NoTypeInformation -Encoding UTF8
+        }
+
+        Write-Log "Metrics history: snapshot appended ($($kept.Count) rows retained)" -Quiet
+    }
+    catch {
+        Write-Log "Failed to append metrics history: $_" -Level WARN
+    }
+}
+
+function Get-MetricsHistory {
+    <#
+    .SYNOPSIS
+        Returns metrics history rows within the last N days, oldest first.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$HistoryPath,
+        [int]$Days = 30
+    )
+
+    if (-not (Test-Path -LiteralPath $HistoryPath)) { return @() }
+
+    try {
+        $cutoff = (Get-Date).AddDays(-$Days)
+        $rows = @(Import-Csv -LiteralPath $HistoryPath) | ForEach-Object {
+            $ts = $_.Timestamp -as [datetime]
+            if ($ts -and $ts -ge $cutoff) {
+                $_ | Add-Member -NotePropertyName TimestampValue -NotePropertyValue $ts -PassThru
+            }
+        }
+        return @($rows | Sort-Object TimestampValue)
+    }
+    catch {
+        Write-Log "Failed to read metrics history: $_" -Level WARN
+        return @()
     }
 }
 

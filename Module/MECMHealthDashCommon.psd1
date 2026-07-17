@@ -1,6 +1,6 @@
 @{
     RootModule        = 'MECMHealthDashCommon.psm1'
-    ModuleVersion     = '1.0.0'
+    ModuleVersion     = '1.1.0'
     GUID              = 'c3d4e5f6-a7b8-9012-cdef-345678901234'
     Author            = 'Jason Ulbright'
     Description       = 'MECM environment health dashboard - deployment, content, DP, client, and site health queries.'
@@ -44,6 +44,10 @@
         'Get-SiteComponentHealth'
         'Get-SiteSystemHealth'
         'Get-SiteHealthCounts'
+
+        # Metrics history (Trends view)
+        'Add-MetricsHistoryEntry'
+        'Get-MetricsHistory'
 
         # Export
         'Export-HealthStatusCsv'

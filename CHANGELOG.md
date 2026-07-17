@@ -3,6 +3,81 @@
 All notable changes to MECM Health Dashboard are documented in this
 file.
 
+## [1.1.0] - 2026-07-17
+
+Doc-verified data-layer corrections (every ConfigMgr WMI class, SQL
+view, and cmdlet call checked against Microsoft Learn), close-crash
+hardening, and two Phase 4 features: Trends and Alerts.
+
+### Fixed (data layer)
+
+- **Client Health / Inactive Devices SQL** — queries referenced
+  `v_CH_ClientSummary.HealthState` and `.LastOnline`, which do not
+  exist; both views failed on every refresh. Now selects
+  `LastEvaluationHealthy` (1 pass / 2 fail / 3 unknown),
+  `LastActiveTime`, and `ClientStateDescription`. Inactive-device
+  aging uses `COALESCE(LastDDR, LastActiveTime)` so DDR-less clients
+  still surface.
+- **Deployment type labels** — `FeatureType` map was off by one:
+  task sequences displayed as "Baseline" and baselines as "Other (6)".
+  Corrected to the documented values (1 Application, 2 Program,
+  5 Software Update, 6 Baseline, 7 Task Sequence, ...).
+- **Deployment names** — grid used `ApplicationName`, which is only
+  populated for application deployments; package / update / TS rows
+  showed blank names. Now prefers `SoftwareName`.
+- **Pull DP flag** — `IsPullDP` is not a top-level property of
+  `SMS_SCI_SysResUse`; every DP showed "No". Now read from the
+  embedded `Props` array.
+- **Get-DeploymentDetails** — called `Get-CMDeploymentStatusDetails
+  -DeploymentID`, a parameter that does not exist (the cmdlet only
+  accepts `-InputObject`). Rewired through the documented chain
+  (Get-CMDeployment -> per-feature-type status cmdlet -> details) and
+  added the missing `Requirements Not Met` (3) status.
+- **Content distribution states** — DP-content pairs in
+  `REMOVAL_PENDING` (4) / `REMOVAL_RETRYING` (5) were counted in no
+  bucket; now tallied as in-progress. Added Device Setting / Virtual
+  App / Application labels to the content name map.
+- **DP status rollup** — `SMS_SiteSystemSummarizer` has one instance
+  per storage object, so a DP with several drives appeared with
+  whichever status happened to come last; now the worst status wins.
+- Removed `Set-CMQueryResultMaximum -Maximum 0` (current cmdlet
+  library is unbounded by default; the 0 semantics are undocumented).
+
+### Fixed (shell)
+
+- **Crash on close** — the `Closing` handler could throw
+  `PipelineStoppedException` during host teardown (see
+  `Logs/HealthDash-crash-20260501-052310.txt`). The handler body is
+  now fully guarded, background pipeline shutdown is asynchronous
+  (`BeginStop` / `CloseAsync` instead of blocking `Stop` on the UI
+  thread), and shutdown-time `PipelineStoppedException` is logged but
+  no longer fatal.
+- **Refresh re-entrancy** — a second refresh no longer stops the
+  in-flight pipeline (which could freeze the UI mid-CIM-abort); it is
+  ignored with a log line instead.
+- **Auto-refresh now arms at launch** when a site is configured,
+  instead of only after the first manual refresh.
+- Client grid: "Last Online" column renamed "Last Active"
+  (`LastActiveTime` semantics); detail panel gains Client State
+  (`ClientStateDescription`).
+
+### Added
+
+- **Trends view** — per-metric rolling history charts (7 / 30 / 90
+  days) drawn in pure WPF. A snapshot of all health counts is appended
+  to `History/metrics-history.csv` at every completed refresh
+  (180-day retention). Nine metrics: compliance %, deployments with
+  errors, content issues, failed pairs, DPs critical / degraded,
+  unhealthy clients, inactive devices, site criticals. Export CSV
+  exports the charted series.
+- **Alerts** — transition-based threshold alerts evaluated after each
+  refresh: any critical site component / site system, any critical DP,
+  any failed DP-content pair, or overall compliance below a
+  configurable floor (70 / 80 / 90 / 95%). Local-only delivery per the
+  roadmap: Windows toast + `Logs/HealthDash-alerts.log` + log drawer.
+  Configured from the new **Options > Alerts** pane; alerts re-fire
+  only after a metric recovers and breaches again.
+
 ## [1.0.0] - 2026-05-02
 
 MECM Health Dashboard is a single-pane environmental health tool for

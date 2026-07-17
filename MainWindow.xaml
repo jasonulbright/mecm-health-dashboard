@@ -166,7 +166,7 @@
                 <StackPanel DockPanel.Dock="Top" Margin="14,14,14,12">
                     <TextBlock x:Name="txtAppTitle" Text="MECM Health Dashboard"
                                FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="txtVersion" Text="v1.0.0" FontSize="10"
+                    <TextBlock x:Name="txtVersion" Text="v1.1.0" FontSize="10"
                                Foreground="{DynamicResource MahApps.Brushes.Gray1}"
                                Margin="0,2,0,0"/>
                 </StackPanel>
@@ -199,6 +199,8 @@
                                 ToolTip="Devices exceeding the inactivity threshold (configurable in Options)"/>
                         <Button x:Name="btnViewSite" Content="Site Health" Style="{StaticResource ViewButtonStyle}"
                                 ToolTip="Site components and site-system roles via SMS_ComponentSummarizer / SMS_SiteSystemSummarizer"/>
+                        <Button x:Name="btnViewTrends" Content="Trends" Style="{StaticResource ViewButtonStyle}"
+                                ToolTip="Rolling 7 / 30 / 90 day history for each health metric, captured at every refresh"/>
 
                         <Button x:Name="btnOptions" Content="Options"
                                 Style="{StaticResource OptionsButtonStyle}"
@@ -468,7 +470,7 @@
                                                 Binding="{Binding HealthState}"/>
                             <DataGridTextColumn Header="Active" Width="80"
                                                 Binding="{Binding ActiveStatus}"/>
-                            <DataGridTextColumn Header="Last Online" Width="130"
+                            <DataGridTextColumn Header="Last Active" Width="130"
                                                 Binding="{Binding LastOnlineDisplay}"/>
                             <DataGridTextColumn Header="Last DDR" Width="130"
                                                 Binding="{Binding LastDDRDisplay}"/>
@@ -513,7 +515,7 @@
                                                 HeaderStyle="{StaticResource GridHeaderCenterStyle}"/>
                             <DataGridTextColumn Header="Device" Width="2*"
                                                 Binding="{Binding DeviceName}"/>
-                            <DataGridTextColumn Header="Last Online" Width="140"
+                            <DataGridTextColumn Header="Last Active" Width="140"
                                                 Binding="{Binding LastOnlineDisplay}"/>
                             <DataGridTextColumn Header="Last DDR" Width="140"
                                                 Binding="{Binding LastDDRDisplay}"/>
@@ -579,6 +581,49 @@
                              Grid.Row="2"
                              Style="{StaticResource DetailTextStyle}"
                              Text="Select a component or site system for details."/>
+                </Grid>
+
+                <!-- ============================================================ -->
+                <!-- View: Trends                                                 -->
+                <!-- ============================================================ -->
+                <Grid x:Name="viewTrends" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,4,0,10">
+                        <TextBlock Text="Metric:" VerticalAlignment="Center" FontSize="12" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="cboTrendMetric" Width="240" FontSize="12" Margin="0,0,16,0"/>
+                        <TextBlock Text="Range:" VerticalAlignment="Center" FontSize="12" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="cboTrendRange" Width="110" FontSize="12">
+                            <ComboBoxItem Content="7 days"/>
+                            <ComboBoxItem Content="30 days" IsSelected="True"/>
+                            <ComboBoxItem Content="90 days"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <Border Grid.Row="1"
+                            BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                            BorderThickness="1"
+                            Background="{DynamicResource MahApps.Brushes.ThemeBackground}">
+                        <Grid>
+                            <Canvas x:Name="canvasTrend" ClipToBounds="True" Margin="8"/>
+                            <TextBlock x:Name="txtTrendEmpty"
+                                       Text="No history yet. Trend data is captured at each completed refresh."
+                                       FontSize="12"
+                                       Foreground="{DynamicResource MahApps.Brushes.Gray1}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock x:Name="txtTrendSummary"
+                               Grid.Row="2"
+                               Text=""
+                               FontSize="11"
+                               Foreground="{DynamicResource MahApps.Brushes.Gray1}"
+                               Margin="2,6,0,0"/>
                 </Grid>
 
                 <!-- Options is rendered via a separate modal MetroWindow popup
