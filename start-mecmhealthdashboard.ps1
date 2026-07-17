@@ -26,7 +26,7 @@
     Updated    : 2026-07-17
 #>
 
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Per feedback_ps_wpf_handler_rules.md and PS51-WPF-001..003: flat-.ps1 GetNewClosure strips $script: scope. $global: survives closure scope-strip and keeps shared mutable state reachable from closure-captured handlers.')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='In a flat .ps1, GetNewClosure strips $script: scope; $global: survives closure scope-strip and keeps shared mutable state reachable from closure-captured handlers.')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification='WPF event handler scriptblocks bind positional sender/args ($s, $e). The sender is required to fulfill the signature even when the handler body does not read it.')]
 [CmdletBinding()]
 param()
@@ -44,7 +44,7 @@ try {
 } catch { $null = $_ }
 
 # =============================================================================
-# STA guard. WPF requires STA. PS51-WPF-009.
+# STA guard. WPF requires STA.
 # =============================================================================
 if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
     $psExe = (Get-Process -Id $PID).Path
@@ -230,9 +230,9 @@ function Set-StatusText {
 # =============================================================================
 # Title-bar drag fallback.
 # Some VS Code PowerShell launch contexts can leave MahApps' custom title thumb
-# unable to initiate native window move. Match the proven mecm-homelab fix:
-# first return HTCAPTION from WM_NCHITTEST for the title band, then keep a
-# managed DragMove fallback for hosts where HwndSource cannot be hooked.
+# unable to initiate native window move. First return HTCAPTION from
+# WM_NCHITTEST for the title band, then keep a managed DragMove fallback for
+# hosts where HwndSource cannot be hooked.
 # =============================================================================
 $script:TitleBarHitTestWindows = @{}
 $script:TitleBarHitTestHooks   = @{}
@@ -463,8 +463,8 @@ $toggleTheme.IsOn = $__startIsDark
 $txtThemeLabel.Text = if ($__startIsDark) { 'Dark Theme' } else { 'Light Theme' }
 Update-SidebarButtonTheme
 # NOTE: ChangeTheme to a non-default theme + WindowTitleBrush mutation are
-# DEFERRED to $window.Add_Loaded. See the supersedence-auditor note about
-# WindowChromeBehavior and NCHITTEST routing on title-bar drag.
+# DEFERRED to $window.Add_Loaded -- doing either at script-top breaks
+# WindowChromeBehavior's NCHITTEST routing on title-bar drag.
 
 $toggleTheme.Add_Toggled({
     $isDark = [bool]$toggleTheme.IsOn
@@ -531,7 +531,7 @@ $btnViewTrends.Add_Click({      Set-ActiveView -View 'Trends' })
 # btnOptions handler is wired below where Show-OptionsDialog is defined.
 
 # =============================================================================
-# Crash handlers (PS51-WPF-010, PS51-WPF-011, PS51-WPF-025).
+# Crash handlers.
 # =============================================================================
 $global:__crashLog = Join-Path $__txDir ('HealthDash-crash-{0}.txt' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 
@@ -1565,10 +1565,9 @@ $btnPauseResume.Add_Click({
 
 # =============================================================================
 # Options modal dialog. Replaces an earlier inline-view implementation that
-# correlated with a title-bar drag failure under non-elevated VS Code launches
-# (per Jason 2026-05-01). The supersedence-auditor / app-packager brand
-# pattern is a separate MetroWindow popup, which keeps the main window's
-# visual tree free of inline option controls.
+# correlated with a title-bar drag failure under non-elevated VS Code
+# launches. A separate MetroWindow popup keeps the main window's visual tree
+# free of inline option controls.
 # =============================================================================
 function Show-OptionsDialog {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification='Modal dialog show / dispose; verb-noun reads as a single action.')]
@@ -2131,8 +2130,7 @@ $window.Add_Loaded({
 
     # Apply user theme prefs AFTER the chrome has fully attached. Calling
     # ChangeTheme + WindowTitleBrush mutation at script-top breaks the title
-    # bar's NCHITTEST routing (drag becomes a no-op). See the supersedence-
-    # auditor note where Update-TitleBarBrushes is defined.
+    # bar's NCHITTEST routing (drag becomes a no-op).
     $isDark = [bool]$global:Prefs['DarkMode']
     if (-not $isDark) {
         [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($window, 'Light.Blue')

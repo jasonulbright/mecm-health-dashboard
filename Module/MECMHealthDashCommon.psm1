@@ -1074,7 +1074,7 @@ function Export-HealthStatusHtml {
     .SYNOPSIS
         Exports a DataTable to a self-contained HTML report. Status conveyed
         by glyph prefix (and bold for nonzero failure counts), not color
-        (per feedback_no_red_green_in_brand.md).
+        (WCAG SC 1.4.1: no red / yellow / green status coloring).
     #>
     param(
         [Parameter(Mandatory)][System.Data.DataTable]$DataTable,

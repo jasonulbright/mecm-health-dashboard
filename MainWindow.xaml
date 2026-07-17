@@ -22,8 +22,7 @@
 
             <!-- Sidebar button template: shade-lift on Pressed instead of MahApps
                  Square default (which inverts colors via VSM and renders white
-                 text invisible on the dark-theme sidebar). See
-                 reference_srl_wpf_brand.md S11. -->
+                 text invisible on the dark-theme sidebar). -->
             <ControlTemplate x:Key="SidebarButtonTemplate" TargetType="Button">
                 <Border x:Name="Bd"
                         Background="{TemplateBinding Background}"
@@ -627,10 +626,8 @@
                 </Grid>
 
                 <!-- Options is rendered via a separate modal MetroWindow popup
-                     (see Show-OptionsDialog in the shell). This matches the
-                     supersedence-auditor / app-packager brand pattern and
-                     keeps the main window's visual tree free of inline option
-                     controls. -->
+                     (see Show-OptionsDialog in the shell), keeping the main
+                     window's visual tree free of inline option controls. -->
 
                 <!-- ============================================================ -->
                 <!-- Progress overlay (refresh in flight)                         -->
