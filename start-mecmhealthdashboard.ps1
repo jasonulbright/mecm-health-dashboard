@@ -22,7 +22,7 @@
 
 .NOTES
     ScriptName : start-mecmhealthdashboard.ps1
-    Version    : 1.1.0
+    Version    : 1.2.0
     Updated    : 2026-07-17
 #>
 
@@ -92,7 +92,7 @@ $global:PrefsPath = Join-Path $PSScriptRoot 'MECMHealthDash.prefs.json'
 function Get-HdPreferences {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification='Returns the full preferences hashtable by design.')]
     param()
-    $defaults = @{
+    return Read-SuiteSettings -Path $global:PrefsPath -Defaults @{
         DarkMode              = $true
         SiteCode              = ''
         SMSProvider           = ''
@@ -102,24 +102,12 @@ function Get-HdPreferences {
         AlertsEnabled         = $true
         AlertCompliancePct    = 80
     }
-    if (Test-Path -LiteralPath $global:PrefsPath) {
-        try {
-            $loaded = Get-Content -LiteralPath $global:PrefsPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            foreach ($k in @($defaults.Keys)) {
-                $val = $loaded.$k
-                if ($null -ne $val) { $defaults[$k] = $val }
-            }
-        } catch { $null = $_ }
-    }
-    return $defaults
 }
 
 function Save-HdPreferences {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification='Writes the full preferences hashtable by design.')]
     param([Parameter(Mandatory)][hashtable]$Prefs)
-    try {
-        $Prefs | ConvertTo-Json | Set-Content -LiteralPath $global:PrefsPath -Encoding UTF8
-    } catch { $null = $_ }
+    $null = Save-SuiteSettings -Path $global:PrefsPath -Settings $Prefs
 }
 
 $global:Prefs = Get-HdPreferences
@@ -1719,7 +1707,7 @@ function Show-OptionsDialog {
 
             <StackPanel x:Name="paneAbout" Visibility="Collapsed">
                 <TextBlock Text="About" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                <TextBlock Text="MECM Health Dashboard v1.1.0" FontSize="13" FontWeight="SemiBold"/>
+                <TextBlock Text="MECM Health Dashboard v1.2.0" FontSize="13" FontWeight="SemiBold"/>
                 <TextBlock Text="Single-pane environmental health for MECM sites: deployments, content distribution, distribution points, client health, inactive devices, and site components / systems. Glyph-only status indicators; no red / yellow / green coloring."
                            FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/>
                 <TextBlock Text="PowerShell 5.1 + WPF (MahApps.Metro). Data layer: ConfigurationManager cmdlets + WMI summarizers + Invoke-Sqlcmd against the CM_&lt;site&gt; database."

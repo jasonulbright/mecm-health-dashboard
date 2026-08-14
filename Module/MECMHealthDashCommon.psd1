@@ -1,20 +1,14 @@
 @{
     RootModule        = 'MECMHealthDashCommon.psm1'
-    ModuleVersion     = '1.1.0'
-    GUID              = 'c3d4e5f6-a7b8-9012-cdef-345678901234'
+    ModuleVersion     = '1.2.0'
+    GUID              = '8d2a6f4e-1c7b-4e93-a5d8-0b6e3f9c2a17'
     Author            = 'Jason Ulbright'
     Description       = 'MECM environment health dashboard - deployment, content, DP, client, and site health queries.'
     PowerShellVersion = '5.1'
 
     FunctionsToExport = @(
-        # Logging
-        'Initialize-Logging'
-        'Write-Log'
-
-        # CM Connection
-        'Connect-CMSite'
-        'Disconnect-CMSite'
-        'Test-CMConnection'
+        # Logging and CM connection come from the vendored SuiteCommon
+        # module (Lib\SuiteCommon), imported globally by the root module.
         'Test-SQLConnection'
 
         # Deployment Health

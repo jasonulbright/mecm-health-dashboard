@@ -3,6 +3,23 @@
 All notable changes to MECM Health Dashboard are documented in this
 file.
 
+## [1.2.0] - 2026-08-14
+
+### Changed
+
+- **Shared plumbing moved to the vendored `SuiteCommon` module.** Logging
+  (`Initialize-Logging`, `Write-Log`) and CM site connection
+  (`Connect-CMSite`, `Disconnect-CMSite`, `Test-CMConnection`) now load
+  from `Lib\SuiteCommon\`, shared across the tool suite and synced from
+  the suite-core repository instead of hand-edited per repo. The
+  connection additionally gains behavior this tool's own copy lacked: a
+  globally scoped CMSite PSDrive, normalized ConfigurationManager module
+  path resolution with known-install-path fallback, provider rebind when
+  the configured SMS Provider changes, and rebuild of a stale drive whose
+  provider connection died.
+- **Module manifest GUID corrected** to a unique value (it previously
+  duplicated another tool's manifest GUID).
+
 ## [1.1.0] - 2026-07-17
 
 Doc-verified data-layer corrections (every ConfigMgr WMI class, SQL
