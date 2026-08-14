@@ -1,5 +1,10 @@
 # MECM Health Dashboard
 
+[![Latest release](https://img.shields.io/github/v/release/jasonulbright/mecm-health-dashboard?label=release)](https://github.com/jasonulbright/mecm-health-dashboard/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/jasonulbright/mecm-health-dashboard/total?label=downloads)](https://github.com/jasonulbright/mecm-health-dashboard/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
+[![License](https://img.shields.io/github/license/jasonulbright/mecm-health-dashboard)](LICENSE)
+
 A PowerShell + WPF (MahApps.Metro) GUI that consolidates MECM (Configuration Manager) environment health into a single dashboard. View deployment status, content distribution failures, DP availability, client health, inactive devices, and site component status with auto-refresh, glyph-based status indicators, and per-view export.
 
 ![MECM Health Dashboard](screenshots/main-dark.png)
