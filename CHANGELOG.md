@@ -3,6 +3,14 @@
 All notable changes to MECM Health Dashboard are documented in this
 file.
 
+## [1.3.1] - 2026-08-16
+
+### Changed
+
+- **Vendored `SuiteCommon` 0.3.2.** Window restore applies the saved
+  geometry before maximizing, so un-maximizing returns to the saved size
+  instead of the XAML defaults.
+
 ## [1.3.0] - 2026-08-16
 
 ### Changed
