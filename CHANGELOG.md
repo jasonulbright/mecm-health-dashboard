@@ -3,6 +3,17 @@
 All notable changes to MECM Health Dashboard are documented in this
 file.
 
+## [1.3.0] - 2026-08-16
+
+### Changed
+
+- **Window chrome, theming, and window-state persistence now come from
+  the vendored `SuiteCommon` module** (0.3.0). The legacy tab-index
+  bridge for pre-WPF state files is preserved. Fixed by the shared
+  layer: this tool's drag fallback never unhooked closed windows, so
+  every window (including each modal dialog) leaked its hook and window
+  reference for the process lifetime.
+
 ## [1.2.0] - 2026-08-14
 
 ### Changed
