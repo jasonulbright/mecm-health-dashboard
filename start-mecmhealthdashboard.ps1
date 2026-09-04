@@ -22,7 +22,7 @@
 
 .NOTES
     ScriptName : start-mecmhealthdashboard.ps1
-    Version    : 1.3.1
+    Version    : 1.3.2
     Updated    : 2026-07-17
 #>
 

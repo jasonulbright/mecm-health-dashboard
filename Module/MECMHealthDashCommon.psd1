@@ -1,6 +1,6 @@
 @{
     RootModule        = 'MECMHealthDashCommon.psm1'
-    ModuleVersion     = '1.3.1'
+    ModuleVersion     = '1.3.2'
     GUID              = '8d2a6f4e-1c7b-4e93-a5d8-0b6e3f9c2a17'
     Author            = 'Jason Ulbright'
     Description       = 'MECM environment health dashboard - deployment, content, DP, client, and site health queries.'

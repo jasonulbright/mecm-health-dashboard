@@ -3,6 +3,19 @@
 All notable changes to MECM Health Dashboard are documented in this
 file.
 
+## [1.3.2] - 2026-09-04
+
+### Changed
+
+- **Vendored `SuiteCommon` 0.4.3.** The module repairs the process
+  PSModulePath at import: a Windows PowerShell process launched from
+  PowerShell 7 inherits the 7.x module directories, and the background
+  runspace opened later autoloaded a Microsoft.PowerShell.Utility without
+  Get-FileHash or ConvertFrom-Json, so background operations failed with
+  an unrelated "term not recognized". A background runspace whose module
+  import fails is disposed and the original error thrown instead of being
+  returned as an opened but unusable worker.
+
 ## [1.3.1] - 2026-08-16
 
 ### Changed
