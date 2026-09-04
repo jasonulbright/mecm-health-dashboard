@@ -165,7 +165,7 @@
                 <StackPanel DockPanel.Dock="Top" Margin="14,14,14,12">
                     <TextBlock x:Name="txtAppTitle" Text="MECM Health Dashboard"
                                FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="txtVersion" Text="v1.1.0" FontSize="10"
+                    <TextBlock x:Name="txtVersion" Text="" FontSize="10"
                                Foreground="{DynamicResource MahApps.Brushes.Gray1}"
                                Margin="0,2,0,0"/>
                 </StackPanel>

@@ -22,7 +22,7 @@
 
 .NOTES
     ScriptName : start-mecmhealthdashboard.ps1
-    Version    : 1.3.2
+    Version    : 1.3.3
     Updated    : 2026-07-17
 #>
 
@@ -131,6 +131,13 @@ $window = [System.Windows.Markup.XamlReader]::Load($reader)
 
 $txtAppTitle   = $window.FindName('txtAppTitle')
 $txtVersion    = $window.FindName('txtVersion')
+# Installed version: the script header is the single source of truth for the
+# sidebar label and the About panel.
+$script:AppVersion = '0.0.0'
+foreach ($headerLine in (Get-Content -LiteralPath $PSCommandPath -TotalCount 80)) {
+    if ($headerLine -match '^\s*Version\s*:\s*([0-9][0-9\.]*[0-9])\s*$') { $script:AppVersion = $Matches[1]; break }
+}
+if ($txtVersion) { $txtVersion.Text = 'v' + $script:AppVersion }
 $txtThemeLabel = $window.FindName('txtThemeLabel')
 $toggleTheme   = $window.FindName('toggleTheme')
 
@@ -1510,7 +1517,7 @@ function Show-OptionsDialog {
 
             <StackPanel x:Name="paneAbout" Visibility="Collapsed">
                 <TextBlock Text="About" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                <TextBlock Text="MECM Health Dashboard v1.3.1" FontSize="13" FontWeight="SemiBold"/>
+                <TextBlock x:Name="txtAboutVersion" Text="MECM Health Dashboard v1.3.1" FontSize="13" FontWeight="SemiBold"/>
                 <TextBlock Text="Single-pane environmental health for MECM sites: deployments, content distribution, distribution points, client health, inactive devices, and site components / systems. Glyph-only status indicators; no red / yellow / green coloring."
                            FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/>
                 <TextBlock Text="PowerShell 5.1 + WPF (MahApps.Metro). Data layer: ConfigurationManager cmdlets + WMI summarizers + Invoke-Sqlcmd against the CM_&lt;site&gt; database."
@@ -1553,6 +1560,8 @@ function Show-OptionsDialog {
     $paneRefresh      = $dlg.FindName('paneRefresh')
     $paneAlerts       = $dlg.FindName('paneAlerts')
     $paneAbout        = $dlg.FindName('paneAbout')
+    $txtAboutVersion  = $dlg.FindName('txtAboutVersion')
+    if ($txtAboutVersion) { $txtAboutVersion.Text = ($txtAboutVersion.Text -replace 'v[0-9][0-9\.]*[0-9]\s*$', ('v' + $script:AppVersion)) }
     $txtSiteCode      = $dlg.FindName('txtSiteCode')
     $txtSmsProvider   = $dlg.FindName('txtSmsProvider')
     $txtSqlServer     = $dlg.FindName('txtSqlServer')

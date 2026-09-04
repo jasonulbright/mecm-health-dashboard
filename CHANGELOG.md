@@ -3,6 +3,15 @@
 All notable changes to MECM Health Dashboard are documented in this
 file.
 
+## [1.3.3] - 2026-09-04
+
+### Fixed
+
+- **Version labels read the script header.** The sidebar version and the
+  About panel carried literal version strings that no release updated;
+  both now read the entry script's `Version` header at startup, so the
+  window always names the version that is actually installed.
+
 ## [1.3.2] - 2026-09-04
 
 ### Changed
