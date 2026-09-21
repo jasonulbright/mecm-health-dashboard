@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Core module for MECM Environment Health Dashboard.
+    Core module for ConfigMgr Health Dashboard.
 
 .DESCRIPTION
     Import this module to get:
@@ -1017,7 +1017,7 @@ function New-HealthSummaryText {
     )
 
     $lines = @(
-        "MECM Environment Health Summary - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
+        "ConfigMgr Environment Health Summary - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
         ("-" * 60),
         "Deployments:  $($DeploymentCounts.TotalDeployments) total, $($DeploymentCounts.FailedDeployments) with errors ($($DeploymentCounts.OverallCompliance)% compliant)",
         "Content:      $($ContentCounts.TotalContentWithIssues) items with issues, $($ContentCounts.TotalFailedPairs) failed DP-content pairs",

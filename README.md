@@ -1,13 +1,13 @@
-# MECM Health Dashboard
+# ConfigMgr Health Dashboard
 
 [![Latest release](https://img.shields.io/github/v/release/jasonulbright/mecm-health-dashboard?label=release)](https://github.com/jasonulbright/mecm-health-dashboard/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/jasonulbright/mecm-health-dashboard/total?label=downloads)](https://github.com/jasonulbright/mecm-health-dashboard/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![License](https://img.shields.io/github/license/jasonulbright/mecm-health-dashboard)](LICENSE)
 
-A PowerShell + WPF (MahApps.Metro) GUI that consolidates MECM (Configuration Manager) environment health into a single dashboard. View deployment status, content distribution failures, DP availability, client health, inactive devices, and site component status with auto-refresh, glyph-based status indicators, and per-view export.
+Consolidates Configuration Manager environment health into a single dashboard. View deployment status, content distribution failures, DP availability, client health, inactive devices, and site component status with auto-refresh, glyph-based status indicators, and per-view export.
 
-![MECM Health Dashboard](screenshots/main-dark.png)
+![ConfigMgr Health Dashboard](screenshots/main-dark.png)
 
 ## Requirements
 
@@ -126,7 +126,7 @@ Stored in `MECMHealthDash.prefs.json` next to the script. Edited via the **Optio
 | Setting | Description |
 |---------|-------------|
 | DarkMode | Dark.Steel (true) or Light.Blue (false) MahApps theme |
-| SiteCode | 3-character MECM site code |
+| SiteCode | 3-character Configuration Manager site code |
 | SMSProvider | SMS Provider server FQDN |
 | SQLServer | SQL Server hostname for CM database (blank = skip SQL views) |
 | AutoRefreshMinutes | Auto-refresh interval (5, 10, 15, 30, 60) |
@@ -141,7 +141,7 @@ Stored in `MECMHealthDash.prefs.json` next to the script. Edited via the **Optio
 - Verify your SQL Server is configured in **Options**.
 - Check the `Logs/` folder for SQL error messages (e.g., `Client health SQL query failed:`).
 - SQL queries run with no timeout (`-QueryTimeout 0`); WMI queries use the CIM default operation timeout. If queries fail, check network connectivity to the SQL / WMI server.
-- If the error mentions an invalid column name, note the exact message and your MECM version -- the queries target the current-branch `v_CH_ClientSummary` schema (`LastActiveTime`, `LastEvaluationHealthy`, `ClientActiveStatus`, `LastDDR`, `LastHW`, `LastPolicyRequest`).
+- If the error mentions an invalid column name, note the exact message and your Configuration Manager version -- the queries target the current-branch `v_CH_ClientSummary` schema (`LastActiveTime`, `LastEvaluationHealthy`, `ClientActiveStatus`, `LastDDR`, `LastHW`, `LastPolicyRequest`).
 
 **Deployments view incomplete or missing rows**
 

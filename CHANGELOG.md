@@ -1,7 +1,16 @@
 # Changelog
 
-All notable changes to MECM Health Dashboard are documented in this
+All notable changes to ConfigMgr Health Dashboard are documented in this
 file.
+
+## [2026.09.21.0008] - 2026-09-21
+
+### Changed
+
+- Use the product name Configuration Manager in the application and the documentation.
+- Name the application ConfigMgr Health Dashboard in the window title, the About pane and the README.
+- Use date versions.
+- Update the shared SuiteCommon module to 2026.09.21.0031.
 
 ## [1.3.3] - 2026-09-04
 

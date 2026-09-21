@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    MahApps.Metro WPF shell for the MECM Health Dashboard.
+    Main window of ConfigMgr Health Dashboard, a tool that shows Configuration Manager environment health in one window.
 
 .DESCRIPTION
     Replaces the v1.0.x WinForms shell with a brand-aligned WPF UI: sidebar
@@ -22,8 +22,8 @@
 
 .NOTES
     ScriptName : start-mecmhealthdashboard.ps1
-    Version    : 1.3.3
-    Updated    : 2026-07-17
+    Version    : 2026.09.21.0008
+    Updated    : 2026-09-21
 #>
 
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='In a flat .ps1, GetNewClosure strips $script: scope; $global: survives closure scope-strip and keeps shared mutable state reachable from closure-captured handlers.')]
@@ -1036,7 +1036,7 @@ function Write-AlertEntry {
     $line = '[{0}] {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
     try { Add-Content -LiteralPath $global:AlertLogPath -Value $line -Encoding UTF8 } catch { $null = $_ }
     Add-LogLine ('ALERT: {0}' -f $Message) -Level WARN
-    if (-not (Send-HdToast -Title 'MECM Health Dashboard' -Message $Message)) {
+    if (-not (Send-HdToast -Title 'ConfigMgr Health Dashboard' -Message $Message)) {
         Add-LogLine 'Toast delivery unavailable; alert recorded in HealthDash-alerts.log only.' -Level WARN
     }
 }
@@ -1453,7 +1453,7 @@ function Show-OptionsDialog {
         <Grid Grid.Column="2" Grid.Row="0" Margin="20,16,20,16">
 
             <StackPanel x:Name="paneConnection" Visibility="Visible">
-                <TextBlock Text="MECM Connection" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                <TextBlock Text="Configuration Manager Connection" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10"/>
 
                 <TextBlock Style="{StaticResource OptLabel}" Text="Site Code"/>
                 <TextBox x:Name="txtSiteCode" FontSize="12" Padding="6,4,6,4" MaxLength="3"
@@ -1517,8 +1517,8 @@ function Show-OptionsDialog {
 
             <StackPanel x:Name="paneAbout" Visibility="Collapsed">
                 <TextBlock Text="About" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                <TextBlock x:Name="txtAboutVersion" Text="MECM Health Dashboard v1.3.1" FontSize="13" FontWeight="SemiBold"/>
-                <TextBlock Text="Single-pane environmental health for MECM sites: deployments, content distribution, distribution points, client health, inactive devices, and site components / systems. Glyph-only status indicators; no red / yellow / green coloring."
+                <TextBlock x:Name="txtAboutVersion" Text="ConfigMgr Health Dashboard v1.3.1" FontSize="13" FontWeight="SemiBold"/>
+                <TextBlock Text="Single-pane environmental health for Configuration Manager sites: deployments, content distribution, distribution points, client health, inactive devices, and site components / systems. Glyph-only status indicators; no red / yellow / green coloring."
                            FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/>
                 <TextBlock Text="PowerShell 5.1 + WPF (MahApps.Metro). Data layer: ConfigurationManager cmdlets + WMI summarizers + Invoke-Sqlcmd against the CM_&lt;site&gt; database."
                            FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0"/>
@@ -1817,7 +1817,7 @@ $btnExportHtml.Add_Click({
     $sfd.InitialDirectory = $reportsDir
     if ($sfd.ShowDialog() -eq $true) {
         $dt = ConvertTo-DataTableForExport -Rows $info.Rows -Columns $info.Columns
-        Export-HealthStatusHtml -DataTable $dt -OutputPath $sfd.FileName -ReportTitle ('MECM Health - {0}' -f $info.Name)
+        Export-HealthStatusHtml -DataTable $dt -OutputPath $sfd.FileName -ReportTitle ('ConfigMgr Health - {0}' -f $info.Name)
         Add-LogLine ('Exported HTML: {0}' -f $sfd.FileName)
     }
 })
@@ -1892,7 +1892,7 @@ $window.Add_Loaded({
     Update-TitleBarBrushes
 
     Update-StatusBarSummary
-    Add-LogLine 'MECM Health Dashboard ready. Configure Site / Provider in Options, then click Refresh All.'
+    Add-LogLine 'ConfigMgr Health Dashboard ready. Configure Site / Provider in Options, then click Refresh All.'
 
     # Arm the auto-refresh timer from launch when a site is already
     # configured -- previously it only started after the first manual
