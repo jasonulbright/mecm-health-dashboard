@@ -1,6 +1,6 @@
 @{
     RootModule        = 'MECMHealthDashCommon.psm1'
-    ModuleVersion     = '2026.09.21.0009'
+    ModuleVersion     = '2026.09.25.0010'
     GUID              = '8d2a6f4e-1c7b-4e93-a5d8-0b6e3f9c2a17'
     Author            = 'Jason Ulbright'
     Description       = 'Configuration Manager environment health dashboard - deployment, content, DP, client, and site health queries.'

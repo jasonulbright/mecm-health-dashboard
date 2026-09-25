@@ -22,8 +22,8 @@
 
 .NOTES
     ScriptName : start-mecmhealthdashboard.ps1
-    Version    : 2026.09.21.0009
-    Updated    : 2026-09-21
+    Version    : 2026.09.25.0010
+    Updated    : 2026-09-25
 #>
 
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='In a flat .ps1, GetNewClosure strips $script: scope; $global: survives closure scope-strip and keeps shared mutable state reachable from closure-captured handlers.')]

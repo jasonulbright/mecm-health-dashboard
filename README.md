@@ -5,6 +5,10 @@
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![License](https://img.shields.io/github/license/jasonulbright/mecm-health-dashboard)](LICENSE)
 
+## Retired
+
+This is the final release. Site Hygiene carries every view of this tool in its Live group: Deployments, Content, Distribution Points, Client Health, Inactive Devices, Site Health, and Trends, with the refresh timer, the optional SQL connection, the metrics history, threshold alerts, and per-view export. Install Site Hygiene from https://github.com/jasonulbright/site-hygiene or from the AppPackager Suite installer. The suite installer zips this tool's folder to `site-hygiene\legacy\mecm-health-dashboard.zip`, keeps its json files, history, logs, and reports under `site-hygiene\legacy\mecm-health-dashboard\`, and removes the folder; Site Hygiene imports the settings and the history from there on its next launch. A side-by-side zip install is imported from the sibling `mecm-health-dashboard` folder and can be deleted after that launch. This repository is archived.
+
 Consolidates Configuration Manager environment health into a single dashboard. View deployment status, content distribution failures, DP availability, client health, inactive devices, and site component status with auto-refresh, glyph-based status indicators, and per-view export.
 
 ![ConfigMgr Health Dashboard](screenshots/main-dark.png)

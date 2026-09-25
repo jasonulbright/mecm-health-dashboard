@@ -3,6 +3,15 @@
 All notable changes to ConfigMgr Health Dashboard are documented in this
 file.
 
+## [2026.09.25.0010] - 2026-09-25
+
+## Final release: every view continues in Site Hygiene
+
+### Changed
+
+- Retire this tool; Site Hygiene carries the views, the timer, the history, and the alerts.
+- Point the README at Site Hygiene and at the migration of local files.
+
 ## [2026.09.21.0009] - 2026-09-21
 
 ### Fixed
